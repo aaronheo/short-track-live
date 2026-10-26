@@ -1,12 +1,13 @@
 # Render blueprint: Dashboard → New → Blueprint → this repo.
-# One always-on service runs the API and the ISU sync worker (the free plan
-# sleeps after 15 minutes idle, which would stop live polling).
+# One service runs the API and the ISU sync worker. It's on the free plan,
+# which sleeps after 15 minutes without requests: ISU is only polled while
+# someone has the app open. Switch to `starter` to keep it always on.
 services:
   - type: web
     name: short-track-live
     runtime: node
     region: oregon            # same AWS region as the Supabase project (us-west-2)
-    plan: starter
+    plan: free
     rootDir: server
     buildCommand: npm ci
     startCommand: npm start

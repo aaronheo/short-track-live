@@ -33,7 +33,7 @@ The server sends ISU at most one request per second and keeps every raw response
 
 ## Deploying (Render)
 
-`render.yaml` describes one always-on web service (Starter plan, Oregon, next to the Supabase project) that runs the API and the sync worker together.
+Live at https://short-track-live.onrender.com (workspace `short-track-live`). `render.yaml` describes it: one web service in Oregon, next to the Supabase project, running the API and the sync worker together. It's on the free plan, so it sleeps after 15 minutes without requests and the first request after that takes about a minute; ISU is only polled while it's awake.
 
 1. Render Dashboard → **New → Blueprint** → pick this repo.
 2. Fill in `DATABASE_URL` with Supabase's **Session pooler** string (Connect → Session pooler). Render has no IPv6, so the direct `db.<ref>.supabase.co` string won't connect.
