@@ -143,7 +143,7 @@ export class SyncWorker {
     const roundIds = new Map<number, number>();
     const roundKeys = new Map<string, number>();
     const norm = (s: string) => s.toLowerCase().replace(/'s\b/g, '').replace(/[^a-z0-9]/g, '');
-    const derived: { startsAt: Date; title: string; label: string; roundId: number }[] = [];
+    const named: { title: string; label: string; roundId: number }[] = [];
     for (const comp of comps) {
       const compId = await this.ingest.upsertCompetition(ev.id, comp);
       const rounds = await this.isu.rounds(comp.event_result_id);
@@ -152,9 +152,10 @@ export class SyncWorker {
         const rid = ids.get(r.event_result_round_id)!;
         roundIds.set(r.event_result_round_id, rid);
         roundKeys.set(norm(comp.name) + '|' + norm(r.name), rid);
-        if (r.date) derived.push({ startsAt: new Date(r.date), title: comp.name, label: r.name, roundId: rid });
+        named.push({ title: comp.name, label: r.name, roundId: rid });
       }
     }
+    const derived = await this.ingest.withStarts(named);
     await this.ingest.rebuildSchedule(ev.id, await this.isu.schedule(ev.slug), roundIds, roundKeys, derived);
     if (comps.length && comps.every((c) => eventState(c.status) === 'finished')) {
       await this.pool.query(`update event set state = 'finished' where id = $1`, [ev.id]);

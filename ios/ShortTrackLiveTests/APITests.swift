@@ -84,6 +84,8 @@ struct FormattingTests {
 
     @Test func zoneNames() {
         #expect(Fmt.zoneName(TimeZone(identifier: "America/Los_Angeles")!) == "PT")
+        let rome = TimeZone(identifier: "Europe/Rome")!
+        #expect(Fmt.zoneName(rome, at: Date(timeIntervalSince1970: 1_770_000_000)) == "CET") // Feb 2026
     }
 }
 

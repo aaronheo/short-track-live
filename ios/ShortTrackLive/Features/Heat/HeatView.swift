@@ -68,7 +68,7 @@ struct HeatView: View {
         return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Text("Pos").frame(width: 28, alignment: .leading)
-                Text("Skater").frame(maxWidth: .infinity, alignment: .leading)
+                Text(data.heat.isRelay ? "Team" : "Skater").frame(maxWidth: .infinity, alignment: .leading)
                 Text(running ? "Last lap" : "Time").frame(width: 72, alignment: .trailing)
                 Color.clear.frame(width: 22, height: 1)
             }
@@ -214,19 +214,33 @@ private struct PositionChart: View {
                 }
             }
             .chartYScale(domain: .automatic(includesZero: false, reversed: true))
-            .chartXScale(domain: 1...max(2, chart.laps))
+            .chartXScale(domain: 1...max(2, chart.laps), range: .plotDimension(startPadding: 6, endPadding: 10))
             .chartYAxis {
                 AxisMarks(position: .leading, values: Array(1...max(1, maxPosition))) { _ in
                     AxisGridLine().foregroundStyle(Theme.divider)
                     AxisValueLabel().foregroundStyle(Theme.muted)
                 }
             }
-            .chartXAxis {
-                AxisMarks(values: xTicks) { _ in
-                    AxisValueLabel().foregroundStyle(Theme.muted)
+            // Lap numbers drawn by hand: Charts' own axis drops the last lap's
+            // label, and the last lap is the one that matters.
+            .chartXAxis(.hidden)
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    if let anchor = proxy.plotFrame {
+                        let plot = geo[anchor]
+                        ForEach(xTicks, id: \.self) { lap in
+                            if let x = proxy.position(forX: lap) {
+                                Text("\(lap)")
+                                    .font(.caption2)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Theme.muted)
+                                    .position(x: plot.minX + x, y: plot.maxY + 14)
+                            }
+                        }
+                    }
                 }
             }
-            .chartXAxisLabel("Lap", position: .bottomTrailing, alignment: .trailing)
+            .padding(.bottom, 20)
             .chartLegend(.hidden)
             .frame(height: CGFloat(max(5, maxPosition)) * 24 + 40)
             .padding(.leading, 8)

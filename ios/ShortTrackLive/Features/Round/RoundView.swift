@@ -95,7 +95,7 @@ private struct RoundHeader: View {
         var parts = [data.round.name]
         if let start = data.round.startsAt {
             parts.append(Fmt.dayLabel(start, in: zone))
-            parts.append("\(data.round.venueTime ?? Fmt.clock(start, in: zone)) \(Fmt.zoneName(zone))")
+            parts.append("\(data.round.venueTime ?? Fmt.clock(start, in: zone)) \(Fmt.zoneName(zone, at: start))")
         }
         return parts.joined(separator: " · ")
     }

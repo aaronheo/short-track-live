@@ -4,17 +4,31 @@
 //   event from_date/to_date are local midnights with a "Z" suffix.
 
 /**
- * ISU's time zone for a venue is sometimes wrong: every Montréal event we've
- * seen (World Tour 2025, Worlds 2026) says America/Halifax, an hour off.
+ * ISU's time zone for a venue is often wrong, sometimes by hours: Montréal is
+ * listed as America/Halifax, Salt Lake City as America/Chicago, Shanghai as
+ * UTC. Heat times are converted with this zone, so we decide it ourselves:
+ * the city for countries with several zones, else the country, else ISU's.
  */
 const CITY_ZONES: Record<string, string> = {
-  'montréal': 'America/Toronto',
-  'montreal': 'America/Toronto',
-  'milano cortina': 'Europe/Rome', // listed as Europe/Berlin: same offset, wrong name
+  montreal: 'America/Toronto', quebec: 'America/Toronto', toronto: 'America/Toronto',
+  calgary: 'America/Edmonton', vancouver: 'America/Vancouver',
+  'salt lake city': 'America/Denver', kearns: 'America/Denver',
+  milwaukee: 'America/Chicago', 'lake placid': 'America/New_York',
 };
 
-export function venueTimeZone(city: string | null | undefined, isuZone: string): string {
-  return CITY_ZONES[(city ?? '').trim().toLowerCase()] ?? isuZone;
+const COUNTRY_ZONES: Record<string, string> = { // IOC code; single-zone countries only
+  CHN: 'Asia/Shanghai', KOR: 'Asia/Seoul', JPN: 'Asia/Tokyo', TPE: 'Asia/Taipei',
+  ITA: 'Europe/Rome', NED: 'Europe/Amsterdam', GER: 'Europe/Berlin', POL: 'Europe/Warsaw',
+  HUN: 'Europe/Budapest', FRA: 'Europe/Paris', BEL: 'Europe/Brussels', GBR: 'Europe/London',
+  AUT: 'Europe/Vienna', SUI: 'Europe/Zurich', CZE: 'Europe/Prague', NOR: 'Europe/Oslo',
+  SWE: 'Europe/Stockholm', FIN: 'Europe/Helsinki', LAT: 'Europe/Riga', BUL: 'Europe/Sofia',
+  TUR: 'Europe/Istanbul',
+};
+
+const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+export function venueTimeZone(city: string | null | undefined, country: string | null | undefined, isuZone: string): string {
+  return CITY_ZONES[plain(city ?? '')] ?? COUNTRY_ZONES[country ?? ''] ?? isuZone;
 }
 
 export function utc(s: string | null | undefined): Date | null {

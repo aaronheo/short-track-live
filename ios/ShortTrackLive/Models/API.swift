@@ -234,6 +234,7 @@ struct HeatResponse: Decodable, Sendable {
         let round: String
         let competition: String
         let event: String
+        let isRelay: Bool
     }
 
     struct Chart: Decodable, Sendable {

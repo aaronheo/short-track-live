@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { shortCountry } from '../src/domain/codes.js';
 import { shortEventName } from '../src/domain/format.js';
 import { normalizeEntries, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
@@ -17,9 +18,11 @@ describe('time', () => {
       .toBe('2026-11-01T17:00:00.000Z');
   });
 
-  it('corrects the time zone ISU gives Montréal', () => {
-    expect(venueTimeZone('Montréal', 'America/Halifax')).toBe('America/Toronto');
-    expect(venueTimeZone('Vancouver', 'America/Los_Angeles')).toBe('America/Los_Angeles');
+  it('decides venue time zones instead of trusting ISU', () => {
+    expect(venueTimeZone('Montréal', 'CAN', 'America/Halifax')).toBe('America/Toronto');
+    expect(venueTimeZone('Salt Lake City', 'USA', 'America/Chicago')).toBe('America/Denver');
+    expect(venueTimeZone('Shanghai', 'CHN', 'UTC')).toBe('Asia/Shanghai');
+    expect(venueTimeZone('Astana', 'KAZ', 'Asia/Qyzylorda')).toBe('Asia/Qyzylorda');
   });
 
   it('formats venue times', () => {
@@ -54,6 +57,12 @@ describe('normalize', () => {
     expect(shortEventName('ISU Short Track World Tour #1')).toBe('World Tour #1');
     expect(shortEventName('ISU CNSG Short Track World Championships')).toBe('World Championships');
     expect(shortEventName('Olympic Winter Games 2026 Short Track Speed Skating')).toBe('Olympic Winter Games 2026');
+  });
+
+  it('shortens formal country names for relay teams', () => {
+    expect(shortCountry("People's Republic of China")).toBe('China');
+    expect(shortCountry('Republic of Korea')).toBe('Korea');
+    expect(shortCountry('Canada')).toBe('Canada');
   });
 
   it('title-cases ISU surnames', () => {

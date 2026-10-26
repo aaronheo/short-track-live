@@ -53,7 +53,7 @@ export interface RoundResponse {
 }
 
 export interface HeatResponse {
-  heat: { id: number; name: string; state: HeatState; roundId: number; round: string; competition: string; event: string };
+  heat: { id: number; name: string; state: HeatState; roundId: number; round: string; competition: string; event: string; isRelay: boolean };
   results: EntryView[];
   summary: string[];
   chart: { laps: number; series: { last: string; iso2: string | null; positions: (number | null)[] }[]; winner: string | null; climber: string | null } | null;
@@ -229,7 +229,7 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
     .map((e) => `${e.last}${e.nation ? ` (${e.nation})` : ''} ${sanctioned[e.status!]}. ISU removes their laps, so one place on each lap has no line.`);
 
   return {
-    heat: { id: h.id, name: h.name, state: h.state, roundId: r.id, round: r.name, competition: r.competition, event: r.event_name },
+    heat: { id: h.id, name: h.name, state: h.state, roundId: r.id, round: r.name, competition: r.competition, event: r.event_name, isRelay: r.is_relay },
     results: list.map((e) => entryView(e, winnerMs, false)),
     summary: h.state === 'official' || h.state === 'unofficial' ? summarize(summaryInput) : [],
     chart, lapTable, notes,

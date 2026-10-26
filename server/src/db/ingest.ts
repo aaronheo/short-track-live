@@ -1,7 +1,7 @@
 import type { Db } from './pool.js';
 import { isRelay } from '../isu/client.js';
 import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSkater } from '../isu/types.js';
-import { iso2 } from '../domain/codes.js';
+import { iso2, shortCountry } from '../domain/codes.js';
 import { heatState, normalizeEntries, titleName, type Entry } from '../domain/normalize.js';
 import { parseRule } from '../domain/rules.js';
 import { isuLocalDate, localWallClockToUtc, utc, venueTimeZone } from '../domain/time.js';
@@ -50,7 +50,7 @@ export class Ingest {
     const loaded = await this.upsertEvent(tree.event);
     const roundIds = new Map<number, number>(); // ISU round id -> ours
     const roundKeys = new Map<string, number>(); // competition + round name -> ours (unlinked schedules)
-    const derived: { startsAt: Date; title: string; label: string; roundId: number }[] = [];
+    const named: { title: string; label: string; roundId: number }[] = [];
 
     for (const comp of tree.competitions) {
       const compId = await this.upsertCompetition(loaded.eventId, comp);
@@ -59,13 +59,38 @@ export class Ingest {
         const rid = ids.get(rnd.event_result_round_id)!;
         roundIds.set(rnd.event_result_round_id, rid);
         roundKeys.set(norm(comp.name) + '|' + norm(rnd.name), rid);
-        const startsAt = utc(rnd.date);
-        if (startsAt) derived.push({ startsAt, title: comp.name, label: rnd.name, roundId: rid });
+        named.push({ title: comp.name, label: rnd.name, roundId: rid });
         await this.loadHeats(rid, loaded.timeZone, rnd.heats, isRelay(comp));
       }
     }
+    const derived = await this.withStarts(named);
     await this.rebuildSchedule(loaded.eventId, tree.schedule, roundIds, roundKeys, derived);
     return loaded;
+  }
+
+  /** Round start times from the database (after syncRoundStarts), for a derived schedule. */
+  async withStarts<T extends { roundId: number }>(rounds: T[]): Promise<(T & { startsAt: Date })[]> {
+    const res = await this.db.query<{ id: number; starts_at: Date | null }>(
+      'select id, starts_at from round where id = any($1)', [rounds.map((r) => r.roundId)]);
+    const starts = new Map(res.rows.map((r) => [r.id, r.starts_at]));
+    return rounds.flatMap((r) => {
+      const startsAt = starts.get(r.roundId);
+      return startsAt ? [{ ...r, startsAt }] : [];
+    });
+  }
+
+  /**
+   * A round starts with its first heat. ISU's round.date can't be trusted:
+   * in the 2025/26 data it's the venue's local time with a "Z" (hours off),
+   * in 2026/27 it's real UTC. Heat times are consistent, so they win.
+   */
+  private async syncRoundStarts(roundIds: number[]): Promise<void> {
+    if (!roundIds.length) return;
+    await this.db.query(
+      `update round r set starts_at = h.first
+       from (select round_id, min(starts_at) as first from heat
+             where round_id = any($1) and starts_at is not null group by round_id) h
+       where r.id = h.round_id and r.starts_at is distinct from h.first`, [roundIds]);
   }
 
   /** Season + event row only (the daily event-list refresh). */
@@ -75,7 +100,7 @@ export class Ingest {
       [['isu_id', 'int'], ['title', 'text'], ['starts_on', 'date'], ['ends_on', 'date']],
       [{ isu_id: Number(ev.season_id), title: ev.season, starts_on: `${first}-07-01`, ends_on: `${first + 1}-06-30` }]);
     await this.nations([[ev.country_code, ev.country_name]]);
-    const timeZone = venueTimeZone(ev.city, ev.time_zone);
+    const timeZone = venueTimeZone(ev.city, ev.country_code, ev.time_zone);
     const ids = await upsertMany(this.db, 'event', [
       ['isu_id', 'int'], ['api_id', 'uuid'], ['slug', 'text'], ['season_id', 'smallint'], ['name', 'text'],
       ['series', 'text'], ['city', 'text'], ['country_code', 'text'], ['time_zone', 'text'],
@@ -116,7 +141,10 @@ export class Ingest {
         time_place: rule?.timePlace ?? null, destination: rule?.destination ?? null,
         starts_at: utc(r.date)?.toISOString() ?? null, state: eventState(r.status),
       };
-    }));
+    })).then(async (ids) => {
+      await this.syncRoundStarts([...ids.values()]);
+      return ids;
+    });
   }
 
   /** Live polling: refresh one round's heats. */
@@ -150,7 +178,7 @@ export class Ingest {
     const teamIds = await upsertMany(this.db, 'relay_team',
       [['isu_id', 'int'], ['api_id', 'uuid'], ['slug', 'text'], ['name', 'text'], ['nation', 'text']],
       dedupe(all.flatMap((e) => (e.team ? [e.team] : [])), (t) => t.id).map((t) => ({
-        isu_id: t.id, api_id: t.api_id || null, slug: t.slug ?? null, name: t.name, nation: t.nf_organization_code || null,
+        isu_id: t.id, api_id: t.api_id || null, slug: t.slug ?? null, name: shortCountry(t.name), nation: t.nf_organization_code || null,
       })));
 
     const entryRows = perHeat.flatMap(({ heatId, entries }) => entries.map((e) => entryRow(heatId, e, skaterIds, teamIds)))
@@ -190,6 +218,7 @@ export class Ingest {
            on conflict do nothing`, [JSON.stringify(members)]);
       }
     }
+    await this.syncRoundStarts([roundId]);
   }
 
   private async skaters(list: IsuSkater[]): Promise<Map<number, number>> {
@@ -250,10 +279,12 @@ export class Ingest {
   /** A finished event whose heats are all official is never fetched again. */
   async markSynced(eventId: number): Promise<boolean> {
     const res = await this.db.query<{ complete: boolean }>(
+      // Complete once every heat is official, or a week after the event, since
+      // ISU sometimes never marks a few heats official (Europeans 2026: 10).
       `update event set synced_at = now(), results_complete = (
-         state = 'finished' and not exists (
+         state = 'finished' and (ends_on < current_date - 7 or not exists (
            select 1 from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
-           where c.event_id = event.id and h.state <> 'official'))
+           where c.event_id = event.id and h.state <> 'official')))
        where id = $1 returning results_complete as complete`, [eventId]);
     return res.rows[0]?.complete ?? false;
   }

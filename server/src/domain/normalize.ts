@@ -1,5 +1,5 @@
 import type { IsuCompetitor, IsuHeat, IsuSkater, IsuTeam } from '../isu/types.js';
-import { iso2, statusCode } from './codes.js';
+import { iso2, shortCountry, statusCode } from './codes.js';
 import { millis } from './time.js';
 
 export type HeatState = 'scheduled' | 'start_list' | 'running' | 'unofficial' | 'official';
@@ -57,7 +57,7 @@ function names(c: IsuCompetitor): { name: string; last: string } {
     const first = c.skaters.first_name?.trim() ?? '';
     return { name: first ? `${first} ${last}` : last, last };
   }
-  const team = c.skaters_team?.name ?? c.started_for_nf_country_name ?? c.started_for_nf_code ?? 'Team';
+  const team = shortCountry(c.skaters_team?.name ?? c.started_for_nf_country_name ?? c.started_for_nf_code ?? 'Team');
   return { name: team, last: team };
 }
 

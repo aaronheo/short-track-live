@@ -60,6 +60,19 @@ describe.skipIf(!url)('database + API', () => {
     expect(by[WT1_2025]).toMatchObject({ source: 'derived' }); // ISU has no schedule for it
   });
 
+  it('starts each round with its first heat (ISU round dates are local time in 2025/26 data)', async () => {
+    const off = await one<{ n: number }>(
+      `select count(*)::int as n from round r
+       where r.starts_at is distinct from (select min(h.starts_at) from heat h where h.round_id = r.id)
+         and exists (select 1 from heat h where h.round_id = r.id and h.starts_at is not null)`);
+    expect(off.n).toBe(0);
+    // WT1 2025 Montréal has no ISU schedule; the derived one starts with the
+    // first heat (Men 500 m Preliminaries, raced at 07:23:58 local).
+    const { body } = await request(app).get(`/events/${WT1_2025}/schedule`).expect(200);
+    expect(body.event.timeZone).toBe('America/Toronto');
+    expect(body.days[0].items[0]).toMatchObject({ venueTime: '07:23', title: 'Men 500 m', round: 'Preliminaries' });
+  });
+
   it('GET /events/:slug/schedule groups the running order by venue day', async () => {
     const res = await request(app).get(`/events/${WT1_2026}/schedule`).expect(200);
     expect(res.body.days.map((d: { label: string }) => d.label)).toEqual(['Fri 23', 'Sat 24', 'Sun 25']);

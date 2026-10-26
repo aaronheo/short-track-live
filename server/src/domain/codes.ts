@@ -7,7 +7,25 @@ const IOC_TO_ISO2: Record<string, string> = {
   LUX: 'LU', MAS: 'MY', MEX: 'MX', MGL: 'MN', MON: 'MC', NED: 'NL', NOR: 'NO', NZL: 'NZ', PHI: 'PH',
   POL: 'PL', POR: 'PT', PRK: 'KP', ROU: 'RO', RSA: 'ZA', RUS: 'RU', SGP: 'SG', SLO: 'SI', SRB: 'RS',
   SUI: 'CH', SVK: 'SK', SWE: 'SE', THA: 'TH', TPE: 'TW', TUR: 'TR', UKR: 'UA', USA: 'US', UZB: 'UZ',
+  ALB: 'AL', AND: 'AD', BIH: 'BA', CYP: 'CY', INA: 'ID', LIE: 'LI', MDA: 'MD', MKD: 'MK', MNE: 'ME',
 };
+
+/** ISU's formal country names, shortened for relay teams and event places. */
+const SHORT_COUNTRY: Record<string, string> = {
+  "People's Republic of China": 'China',
+  'Republic of Korea': 'Korea',
+  "Democratic People's Republic of Korea": 'North Korea',
+  'United States of America': 'United States',
+  'Islamic Republic of Iran': 'Iran',
+  'Republic of Moldova': 'Moldova',
+  'Russian Federation': 'Russia',
+  'Kingdom of the Netherlands': 'Netherlands',
+  'Hong Kong, China': 'Hong Kong',
+};
+
+export function shortCountry(name: string): string {
+  return SHORT_COUNTRY[name.trim()] ?? name;
+}
 
 /** ISO alpha-2 for an IOC code; null when there's no flag (e.g. AIN neutral athletes). */
 export function iso2(ioc: string | null | undefined): string | null {

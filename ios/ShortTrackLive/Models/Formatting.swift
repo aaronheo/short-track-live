@@ -56,17 +56,25 @@ enum Fmt {
         return date.formatted(style).replacingOccurrences(of: ",", with: "")
     }
 
-    /// "PT", "ET", "CET": the generic short name, or the abbreviation.
-    static func zoneName(_ zone: TimeZone) -> String {
+    /// "PT", "ET" in North America, "CET"/"CEST" in Europe, else "GMT+9" etc.
+    static func zoneName(_ zone: TimeZone, at date: Date = .now) -> String {
         if let generic = zone.localizedName(for: .shortGeneric, locale: Locale(identifier: "en_US")),
            !generic.hasPrefix("GMT"), generic.count <= 4 {
             return generic
         }
-        return zone.abbreviation() ?? zone.identifier
+        let style: NSTimeZone.NameStyle = zone.isDaylightSavingTime(for: date) ? .shortDaylightSaving : .shortStandard
+        if let european = zone.localizedName(for: style, locale: Locale(identifier: "en_GB")), !european.hasPrefix("GMT+"),
+           !european.hasPrefix("GMT-") {
+            return european
+        }
+        return zone.abbreviation(for: date) ?? zone.identifier
     }
 
-    /// "Canada" + "Vancouver" → "Vancouver, Canada"
+    /// "Seoul, South Korea": the system's short country name rather than
+    /// ISU's ("Republic of Korea").
     static func place(_ event: EventSummary) -> String {
-        [event.city, event.countryName].compactMap { $0 }.joined(separator: ", ")
+        let country = event.iso2.flatMap { $0 == "CN" ? "China" : Locale(identifier: "en_US").localizedString(forRegionCode: $0) }
+            ?? event.countryName
+        return [event.city, country].compactMap { $0 }.joined(separator: ", ")
     }
 }

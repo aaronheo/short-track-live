@@ -62,7 +62,12 @@ struct EventsView: View {
     @ViewBuilder
     private func lists(_ data: EventsResponse) -> some View {
         let upcoming = data.events.filter { $0.state == .upcoming }
-        let finished = data.events.filter { $0.state == .finished }.reversed()
+        var finished = Array(data.events.filter { $0.state == .finished }.reversed())
+        // Mid-season with nothing on: the event that just finished comes first.
+        if data.live == nil, !upcoming.isEmpty, let latest = finished.first {
+            EventSection(title: "Latest results", events: [latest]) {}
+            let _ = finished.removeFirst()
+        }
         if !upcoming.isEmpty {
             EventSection(title: "Coming up", events: Array(upcoming)) {
                 if !finished.isEmpty {
@@ -79,7 +84,7 @@ struct EventsView: View {
             }
         }
         if upcoming.isEmpty || showAll, !finished.isEmpty {
-            EventSection(title: upcoming.isEmpty && data.live == nil ? "Events" : "Earlier this season", events: Array(finished)) {}
+            EventSection(title: upcoming.isEmpty && data.live == nil ? "Events" : "Earlier this season", events: finished) {}
                 .transition(.opacity.combined(with: .move(edge: .top)))
         }
         if data.events.isEmpty {
