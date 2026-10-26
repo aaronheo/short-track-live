@@ -17,6 +17,9 @@ targets:
     platform: iOS
     sources:
       - path: ShortTrackLive
+    configFiles:
+      Debug: Config/App.xcconfig
+      Release: Config/App.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aaronheo.shorttracklive
@@ -25,9 +28,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        # Our server (server/). The simulator reaches the Mac at localhost; on a
-        # phone, pass -APIBaseURL http://<mac-ip>:4310 as a launch argument.
-        API_BASE_URL: "http://localhost:4310"
     info:
       path: ShortTrackLive/Info.plist
       properties:
@@ -36,6 +36,7 @@ targets:
           - CFBundleURLName: com.aaronheo.shorttracklive
             CFBundleURLSchemes: [shorttrack]
         APIBaseURL: $(API_BASE_URL)
+        APIToken: $(API_TOKEN)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:

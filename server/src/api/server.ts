@@ -5,6 +5,6 @@ import { createApp } from './app.js';
 const port = Number(process.env.PORT ?? 4310);
 const replayHeat = process.env.REPLAY_HEAT ? Number(process.env.REPLAY_HEAT) : null;
 
-createApp(createPool(), { replayHeat }).listen(port, () => {
+createApp(createPool(), { replayHeat, token: process.env.API_TOKEN }).listen(port, () => {
   console.log(`API on http://localhost:${port}${replayHeat ? ` (replaying heat ${replayHeat})` : ''}`);
 });

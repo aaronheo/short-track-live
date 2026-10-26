@@ -31,6 +31,16 @@ Apply `supabase/migrations/0001_init.sql` to the database once, then:
 
 The server sends ISU at most one request per second and keeps every raw response in `server/.cache/`.
 
+## Deploying (Render)
+
+`render.yaml` describes one always-on web service (Starter plan, Oregon, next to the Supabase project) that runs the API and the sync worker together.
+
+1. Render Dashboard → **New → Blueprint** → pick this repo.
+2. Fill in `DATABASE_URL` with Supabase's **Session pooler** string (Connect → Session pooler). Render has no IPv6, so the direct `db.<ref>.supabase.co` string won't connect.
+3. Render generates `API_TOKEN`. Copy `ios/Config/Secrets.xcconfig.example` to `ios/Config/Secrets.xcconfig` and put the service URL and that token in it.
+
+Every push to `main` redeploys. The raw ISU cache lives on the service's disk and is lost on redeploy; that only costs a refetch of events that aren't complete yet.
+
 ## iOS app
 
 ```bash
@@ -38,7 +48,7 @@ brew install xcodegen
 cd ios && xcodegen generate && open ShortTrackLive.xcodeproj
 ```
 
-The app talks to `http://localhost:4310` (set by `API_BASE_URL` in `project.yml`). On a real phone, pass `-APIBaseURL http://<your-mac-ip>:4310` as a launch argument. Deep links for testing: `shorttrack://event/<slug>`, `shorttrack://round/<id>`, `shorttrack://heat/<id>`.
+The app talks to `http://localhost:4310` by default (`ios/Config/App.xcconfig`). To use the deployed server, create `ios/Config/Secrets.xcconfig` as described above; launch arguments `-APIBaseURL` and `-APIToken` override both. Deep links for testing: `shorttrack://event/<slug>`, `shorttrack://round/<id>`, `shorttrack://heat/<id>`.
 
 Flags are from [flag-icons](https://github.com/lipis/flag-icons) (MIT, see `ios/ShortTrackLive/Resources/FlagIconsLICENSE.txt`).
 

@@ -12,3 +12,6 @@ ios/*.xcodeproj/
 ios/build/
 DerivedData/
 xcuserdata/
+
+# Server URL and token for the deployed server
+ios/Config/Secrets.xcconfig

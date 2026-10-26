@@ -123,6 +123,14 @@ describe.skipIf(!url)('database + API', () => {
     expect(current.body.season).toBe('2026/2027');
   });
 
+  it('requires the token when one is set, except for the health check', async () => {
+    const locked = createApp(pool, { now: () => NOW, token: 'secret' });
+    await request(locked).get('/health').expect(200);
+    await request(locked).get('/seasons').expect(401);
+    await request(locked).get('/seasons').set('Authorization', 'Bearer wrong').expect(401);
+    await request(locked).get('/seasons').set('Authorization', 'Bearer secret').expect(200);
+  });
+
   it('answers 304 when nothing changed', async () => {
     const first = await request(app).get(`/events/${WT1_2026}/schedule`).expect(200);
     await request(app).get(`/events/${WT1_2026}/schedule`).set('If-None-Match', first.headers.etag!).expect(304);

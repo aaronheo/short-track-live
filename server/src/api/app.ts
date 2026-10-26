@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
@@ -8,6 +9,11 @@ export interface AppOptions {
   now?: () => Date;
   /** Dev: our heat id to replay as live (see dev/replay.ts). */
   replayHeat?: number | null;
+  /**
+   * Bearer token the app must send. Set in production (API_TOKEN) so the
+   * public URL doesn't republish ISU's data to anyone; unset locally.
+   */
+  token?: string | null;
 }
 
 /**
@@ -26,6 +32,15 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     (req: Request, res: Response, next: NextFunction) => { fn(req, res).catch(next); };
 
   app.get('/health', (_req, res) => { res.json({ ok: true }); });
+
+  if (opts.token) {
+    const expected = Buffer.from(`Bearer ${opts.token}`);
+    app.use((req, res, next) => {
+      const given = Buffer.from(req.get('authorization') ?? '');
+      if (given.length === expected.length && timingSafeEqual(given, expected)) return next();
+      res.status(401).json({ error: 'Unauthorized' });
+    });
+  }
 
   app.get('/seasons', wrap(async (_req, res) => {
     res.json((await repo.seasons()).map((s) => ({ title: s.title, startsOn: s.starts_on, endsOn: s.ends_on })));

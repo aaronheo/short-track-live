@@ -1,0 +1,7 @@
+// Where the app finds our server (server/). The simulator reaches the Mac at
+// localhost. To use the deployed server, copy Secrets.xcconfig.example to
+// Secrets.xcconfig (gitignored) and fill it in; it overrides these.
+API_BASE_URL = http:/$()/localhost:4310
+API_TOKEN =
+
+#include? "Secrets.xcconfig"

@@ -1,0 +1,22 @@
+# Render blueprint: Dashboard → New → Blueprint → this repo.
+# One always-on service runs the API and the ISU sync worker (the free plan
+# sleeps after 15 minutes idle, which would stop live polling).
+services:
+  - type: web
+    name: short-track-live
+    runtime: node
+    region: oregon            # same AWS region as the Supabase project (us-west-2)
+    plan: starter
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Supabase Session pooler string (Connect → Session pooler). Render has
+      # no IPv6, so the direct db.<ref>.supabase.co connection won't work.
+      - key: DATABASE_URL
+        sync: false
+      - key: API_TOKEN
+        generateValue: true
