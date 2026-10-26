@@ -128,7 +128,31 @@ struct FinishedHeats: View {
     let isRelay: Bool
     @Binding var expanded: Set<Int>
 
+    private var allOpen: Bool { heats.allSatisfy { expanded.contains($0.id) } }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if heats.count > 1 {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Finished heats").sectionLabel()
+                    Spacer()
+                    Button(allOpen ? "Collapse all" : "Expand all") {
+                        let ids = Set(heats.map(\.id))
+                        withAnimation(.snappy) {
+                            expanded = allOpen ? expanded.subtracting(ids) : expanded.union(ids)
+                        }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.link)
+                    .sensoryFeedback(.selection, trigger: allOpen)
+                }
+                .padding(.horizontal, 16)
+            }
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(spacing: 0) {
             ForEach(Array(heats.enumerated()), id: \.element.id) { index, heat in
                 if index > 0 { RowDivider() }
