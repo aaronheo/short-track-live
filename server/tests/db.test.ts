@@ -106,6 +106,8 @@ describe.skipIf(!url)('database + API', () => {
     const { body } = await request(app).get('/seasons/2026-2027/events').expect(200);
     expect(body.live).toMatchObject({ slug: WT1_2026, day: 1, days: 3, iso2: 'CA' });
     expect(body.live.onTheIce).toMatchObject({ competition: 'Men 1500 m', round: 'Quarterfinals', heat: 'Heat 5 of 7', lap: 'Lap 3 of 14' });
+    const current = await request(app).get('/seasons/current/events').expect(200);
+    expect(current.body.season).toBe('2026/2027');
   });
 
   it('answers 304 when nothing changed', async () => {

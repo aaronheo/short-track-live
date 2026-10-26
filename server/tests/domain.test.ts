@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { shortEventName } from '../src/domain/format.js';
 import { normalizeEntries, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
 import { summarize } from '../src/domain/summary.js';
-import { clock, dayLabel, lapsFor, localWallClockToUtc, millis } from '../src/domain/time.js';
+import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone } from '../src/domain/time.js';
 import { WORLDS, WT1_2026, placeHeats, round, tree } from './fixtures.js';
 
 describe('time', () => {
@@ -14,6 +15,11 @@ describe('time', () => {
     // Across a DST change (Montréal, first Sunday of November).
     expect(localWallClockToUtc('2026-11-01T12:00:00.000Z', 'America/Toronto')?.toISOString())
       .toBe('2026-11-01T17:00:00.000Z');
+  });
+
+  it('corrects the time zone ISU gives Montréal', () => {
+    expect(venueTimeZone('Montréal', 'America/Halifax')).toBe('America/Toronto');
+    expect(venueTimeZone('Vancouver', 'America/Los_Angeles')).toBe('America/Los_Angeles');
   });
 
   it('formats venue times', () => {
@@ -42,6 +48,12 @@ describe('normalize', () => {
     const betti = normalizeEntries(raw).filter((e) => e.last === 'Betti');
     expect(betti).toHaveLength(1);
     expect(betti[0]!.rank).toBe(2);
+  });
+
+  it('shortens event names for the app', () => {
+    expect(shortEventName('ISU Short Track World Tour #1')).toBe('World Tour #1');
+    expect(shortEventName('ISU CNSG Short Track World Championships')).toBe('World Championships');
+    expect(shortEventName('Olympic Winter Games 2026 Short Track Speed Skating')).toBe('Olympic Winter Games 2026');
   });
 
   it('title-cases ISU surnames', () => {

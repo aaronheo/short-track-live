@@ -1,0 +1,77 @@
+name: ShortTrackLive
+options:
+  bundleIdPrefix: com.aaronheo
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: NO
+targets:
+  ShortTrackLive:
+    type: application
+    platform: iOS
+    sources:
+      - path: ShortTrackLive
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aaronheo.shorttracklive
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Our server (server/). The simulator reaches the Mac at localhost; on a
+        # phone, pass -APIBaseURL http://<mac-ip>:4310 as a launch argument.
+        API_BASE_URL: "http://localhost:4310"
+    info:
+      path: ShortTrackLive/Info.plist
+      properties:
+        CFBundleDisplayName: Short Track
+        CFBundleURLTypes:
+          - CFBundleURLName: com.aaronheo.shorttracklive
+            CFBundleURLSchemes: [shorttrack]
+        APIBaseURL: $(API_BASE_URL)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Short Track connects to its results server on your local network during development.
+  ShortTrackLiveTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ShortTrackLiveTests
+    dependencies:
+      - target: ShortTrackLive
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.aaronheo.shorttracklive.tests
+schemes:
+  ShortTrackLive:
+    build:
+      targets:
+        ShortTrackLive: all
+        ShortTrackLiveTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ShortTrackLiveTests

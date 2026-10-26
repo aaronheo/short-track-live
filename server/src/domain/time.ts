@@ -3,10 +3,19 @@
 //   heat.date is the venue's wall-clock time with a fake "Z" suffix;
 //   event from_date/to_date are local midnights with a "Z" suffix.
 
-/** ISU's time zone for an event is sometimes wrong; these are corrected by slug. */
-export const TZ_OVERRIDES: Record<string, string> = {
-  'isu-short-track-world-tour-14': 'America/Toronto', // Montréal 2025, listed as America/Halifax
+/**
+ * ISU's time zone for a venue is sometimes wrong: every Montréal event we've
+ * seen (World Tour 2025, Worlds 2026) says America/Halifax, an hour off.
+ */
+const CITY_ZONES: Record<string, string> = {
+  'montréal': 'America/Toronto',
+  'montreal': 'America/Toronto',
+  'milano cortina': 'Europe/Rome', // listed as Europe/Berlin: same offset, wrong name
 };
+
+export function venueTimeZone(city: string | null | undefined, isuZone: string): string {
+  return CITY_ZONES[(city ?? '').trim().toLowerCase()] ?? isuZone;
+}
 
 export function utc(s: string | null | undefined): Date | null {
   if (!s) return null;

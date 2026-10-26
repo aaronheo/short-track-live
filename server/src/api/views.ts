@@ -2,7 +2,7 @@
 // Swift models in ios/ShortTrackLive/Models mirror them.
 
 import { QUALIFIED_CODES } from '../domain/codes.js';
-import { gap, raceTime } from '../domain/format.js';
+import { gap, raceTime, shortEventName } from '../domain/format.js';
 import type { HeatState } from '../domain/normalize.js';
 import { placesCard, type PlacesCard } from '../domain/places.js';
 import type { QualRule } from '../domain/rules.js';
@@ -13,7 +13,7 @@ import type { EntryRow, EventRow, HeatRow, LapRow, RoundRow, ScheduleRow } from 
 type State = 'upcoming' | 'live' | 'finished';
 
 export interface EventSummary {
-  slug: string; name: string; series: string | null; city: string | null; countryName: string | null;
+  slug: string; name: string; shortName: string; series: string | null; city: string | null; countryName: string | null;
   iso2: string | null; startsOn: string; endsOn: string; state: State;
 }
 export interface OnTheIce { roundId: number; competition: string; round: string; heat: string | null; lap: string | null }
@@ -65,7 +65,7 @@ const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 export function eventSummary(e: EventRow): EventSummary {
   return {
-    slug: e.slug, name: e.name, series: e.series, city: e.city, countryName: e.country_name, iso2: e.iso2,
+    slug: e.slug, name: e.name, shortName: shortEventName(e.name), series: e.series, city: e.city, countryName: e.country_name, iso2: e.iso2,
     startsOn: e.starts_on, endsOn: e.ends_on, state: e.state,
   };
 }

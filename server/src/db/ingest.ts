@@ -4,7 +4,7 @@ import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuSchedul
 import { iso2 } from '../domain/codes.js';
 import { heatState, normalizeEntries, titleName, type Entry } from '../domain/normalize.js';
 import { parseRule } from '../domain/rules.js';
-import { isuLocalDate, localWallClockToUtc, TZ_OVERRIDES, utc } from '../domain/time.js';
+import { isuLocalDate, localWallClockToUtc, utc, venueTimeZone } from '../domain/time.js';
 
 type EventState = 'upcoming' | 'live' | 'finished';
 const EVENT_STATE: Record<string, EventState> = {
@@ -75,7 +75,7 @@ export class Ingest {
       [['isu_id', 'int'], ['title', 'text'], ['starts_on', 'date'], ['ends_on', 'date']],
       [{ isu_id: Number(ev.season_id), title: ev.season, starts_on: `${first}-07-01`, ends_on: `${first + 1}-06-30` }]);
     await this.nations([[ev.country_code, ev.country_name]]);
-    const timeZone = TZ_OVERRIDES[ev.slug] ?? ev.time_zone;
+    const timeZone = venueTimeZone(ev.city, ev.time_zone);
     const ids = await upsertMany(this.db, 'event', [
       ['isu_id', 'int'], ['api_id', 'uuid'], ['slug', 'text'], ['season_id', 'smallint'], ['name', 'text'],
       ['series', 'text'], ['city', 'text'], ['country_code', 'text'], ['time_zone', 'text'],

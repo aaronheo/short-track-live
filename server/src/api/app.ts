@@ -31,10 +31,12 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     res.json((await repo.seasons()).map((s) => ({ title: s.title, startsOn: s.starts_on, endsOn: s.ends_on })));
   }));
 
-  // Season titles contain a slash, so the path uses a dash: /seasons/2025-2026/events
+  // Season titles contain a slash, so the path uses a dash: /seasons/2025-2026/events.
+  // /seasons/current/events is the latest season we have.
   app.get('/seasons/:season/events', wrap(async (req, res) => {
     const seasons = await repo.seasons();
-    const title = String(req.params.season).replace('-', '/');
+    const param = String(req.params.season);
+    const title = param === 'current' ? seasons[0]?.title ?? '' : param.replace('-', '/');
     if (!seasons.some((s) => s.title === title)) return res.status(404).json({ error: 'Unknown season' });
     const events = await repo.events(title);
     const liveRow = events.find((e) => e.state === 'live') ?? null;
