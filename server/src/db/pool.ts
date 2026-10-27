@@ -18,6 +18,7 @@ export function createPool(url = process.env.DATABASE_URL): pg.Pool {
     ssl: local ? undefined : { rejectUnauthorized: false },
     max: 5,
     idleTimeoutMillis: 30_000,
+    keepAlive: true, // notice a connection that died quietly instead of waiting on it forever
   });
   // Supabase drops idle connections now and then. The pool replaces them;
   // without this listener the error would crash the process.
