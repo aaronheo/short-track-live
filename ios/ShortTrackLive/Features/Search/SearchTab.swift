@@ -7,14 +7,18 @@ struct SearchTab: View {
     @Environment(AppModel.self) private var model
     let split: Bool
     @State private var query = ""
+    /// Bumped on Return in the search field. The handler has to sit where
+    /// .searchable is: a submit action only reaches fields below it.
+    @State private var submits = 0
 
     var body: some View {
         @Bindable var model = model
         if split {
             NavigationSplitView {
-                SearchResults(query: query)
+                SearchResults(query: query, submits: submits)
                     .navigationTitle("Search")
                     .searchable(text: $query, placement: .sidebar, prompt: "Search or ask")
+                    .onSubmit(of: .search) { submits += 1 }
                     .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
             } detail: {
                 NavigationStack(path: $model.searchDetailPath) {
@@ -34,9 +38,10 @@ struct SearchTab: View {
             .navigationSplitViewStyle(.balanced)
         } else {
             NavigationStack(path: $model.searchPath) {
-                SearchResults(query: query)
+                SearchResults(query: query, submits: submits)
                     .navigationTitle("Search")
                     .searchable(text: $query, prompt: "Search or ask")
+                    .onSubmit(of: .search) { submits += 1 }
                     .navigationDestination(for: Route.self) { route in destination(route) }
             }
         }
@@ -67,6 +72,7 @@ struct RecentAthlete: Codable, Hashable, Identifiable {
 private struct SearchResults: View {
     @Environment(AppModel.self) private var model
     let query: String
+    let submits: Int
     @State private var results: [AthleteHit] = []
     @State private var resultsFor = ""
     @State private var failed = false
@@ -116,7 +122,7 @@ private struct SearchResults: View {
         .tabBarHidesOnScroll()
         .background(Theme.ground)
         .task(id: trimmed) { await search() }
-        .onSubmit(of: .search) {
+        .onChange(of: submits) {
             // Return on a question (or a name with no matches) asks it.
             if isQuestion || (resultsFor == trimmed && results.isEmpty && trimmed.count >= 2) { model.openAsk(trimmed) }
         }
