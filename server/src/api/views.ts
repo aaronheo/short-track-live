@@ -33,7 +33,7 @@ export interface ScheduleResponse {
 }
 
 export interface EntryView {
-  id: number; rank: number | null; name: string; last: string; nat: string | null; iso2: string | null;
+  id: number; athleteId: number | null; rank: number | null; name: string; last: string; nat: string | null; iso2: string | null;
   startPosition: number | null; time: string | null; gap: string | null; status: string | null;
   badge: string | null; lastLap: string | null; laps: number;
 }
@@ -98,7 +98,7 @@ export function scheduleView(event: EventRow, rows: ScheduleRow[]): ScheduleResp
 
 function entryView(e: EntryRow, winnerMs: number | null, running: boolean): EntryView {
   return {
-    id: e.id, rank: running ? e.last_position : e.rank, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2,
+    id: e.id, athleteId: e.skater_id, rank: running ? e.last_position : e.rank, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2,
     startPosition: e.start_position,
     time: running ? null : e.time_text,
     gap: !running && e.time_ms != null && winnerMs != null && e.time_ms > winnerMs ? gap(e.time_ms - winnerMs) : null,

@@ -5,10 +5,11 @@ enum Route: Hashable {
     case round(Int)
     case heat(Int)
     case athlete(Int)
+    case ask(String) // the first question of a conversation
 }
 
 enum AppTab: Hashable {
-    case events, search
+    case events, settings, search
 }
 
 /// Navigation state for both layouts. On a phone everything is one stack
@@ -30,6 +31,7 @@ final class AppModel {
     // sidebar, the athlete in the detail.
     var searchPath: [Route] = []
     var searchAthlete: Int?
+    var searchQuestion: String?
     var searchDetailPath: [Route] = []
 
     private(set) var isSplit = false
@@ -47,12 +49,50 @@ final class AppModel {
             detailRound = path.lazy.compactMap { if case .round(let id) = $0 { id } else { nil } }.last
             detailPath = path.filter { if case .heat = $0 { true } else { false } }
             if detailRound == nil { detailPath = [] }
-            searchAthlete = searchPath.lazy.compactMap { if case .athlete(let id) = $0 { id } else { nil } }.last
-            searchDetailPath = searchAthlete == nil ? [] : Array(searchPath.drop { if case .athlete = $0 { false } else { true } }.dropFirst())
+            // The search detail pane starts with the first athlete or conversation.
+            searchAthlete = nil
+            searchQuestion = nil
+            searchDetailPath = []
+            if let first = searchPath.first {
+                switch first {
+                case .athlete(let id): searchAthlete = id
+                case .ask(let question): searchQuestion = question
+                default: break
+                }
+                searchDetailPath = Array(searchPath.dropFirst())
+            }
         } else {
             path = sidebarPath + (detailRound.map { [Route.round($0)] } ?? []) + detailPath
-            searchPath = (searchAthlete.map { [Route.athlete($0)] } ?? []) + searchDetailPath
+            let root: [Route] = searchQuestion.map { [.ask($0)] } ?? searchAthlete.map { [.athlete($0)] } ?? []
+            searchPath = root + searchDetailPath
         }
+    }
+
+    /// From the search field: start a conversation with this question.
+    func openAsk(_ question: String) {
+        tab = .search
+        if isSplit {
+            searchQuestion = question
+            searchAthlete = nil
+            searchDetailPath = []
+        } else {
+            searchPath = [.ask(question)]
+        }
+    }
+
+    /// A link in an answer: athletes and races open on top of the conversation.
+    func openFromAsk(_ url: URL) -> Bool {
+        guard url.scheme == "shorttrack", let kind = url.host(), let value = url.pathComponents.dropFirst().first,
+              let id = Int(value) else { return false }
+        let route: Route
+        switch kind {
+        case "athlete": route = .athlete(id)
+        case "heat": route = .heat(id)
+        case "round": route = .round(id)
+        default: return false
+        }
+        if isSplit { searchDetailPath.append(route) } else { searchPath.append(route) }
+        return true
     }
 
     /// From search results (or a recent athlete).
@@ -60,6 +100,7 @@ final class AppModel {
         tab = .search
         if isSplit {
             searchAthlete = id
+            searchQuestion = nil
             searchDetailPath = []
         } else {
             searchPath = [.athlete(id)]

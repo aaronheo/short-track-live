@@ -43,17 +43,47 @@ export class SyncWorker {
    * from the disk cache if we've seen them) and marked complete; complete
    * events are skipped. Upcoming events get just their event row.
    */
-  async backfill(seasonTitles: string[]): Promise<void> {
+  async backfill(seasonTitles: string[], opts: { maxDbBytes?: number } = {}): Promise<void> {
     for (const title of seasonTitles) {
       const events = await this.isu.events(title);
       this.log(`${title}: ${events.length} events`);
       for (const ev of events) {
+        if (opts.maxDbBytes && await this.dbBytes() > opts.maxDbBytes) {
+          this.log(`database is over ${Math.round(opts.maxDbBytes / 1e6)} MB; stopping the backfill here`);
+          return;
+        }
         await this.ingest.upsertEvent(ev);
         if (eventState(ev.state) === 'upcoming') continue;
         if (await this.isComplete(ev.slug)) continue;
-        await this.pullWholeEvent(ev);
+        for (let attempt = 1; ; attempt++) {
+          try {
+            await this.pullWholeEvent(ev);
+            break;
+          } catch (err) {
+            // A dropped connection is worth another go (ISU responses are
+            // cached, so it's cheap). Older events can also have data we don't
+            // handle yet; skip those and keep going.
+            if (isConnectionError(err) && attempt < 3) {
+              this.log(`${ev.name} (${ev.season}): ${(err as Error).message}, retrying`);
+              await sleep(10_000 * attempt);
+              continue;
+            }
+            this.log(`${ev.name} (${ev.season}): skipped, ${(err as Error).message}`);
+            break;
+          }
+        }
       }
     }
+  }
+
+  /** Every season ISU lists, newest first (for the one-off history backfill). */
+  async allSeasons(): Promise<string[]> {
+    return (await this.isu.seasons()).map((s) => s.title);
+  }
+
+  private async dbBytes(): Promise<number> {
+    const res = await this.pool.query<{ bytes: string }>('select pg_database_size(current_database()) as bytes');
+    return Number(res.rows[0]!.bytes);
   }
 
   private async pullWholeEvent(ev: IsuEvent): Promise<void> {
@@ -61,6 +91,11 @@ export class SyncWorker {
     const finished = eventState(ev.state) === 'finished';
     const tree = await this.isu.pullEvent(ev, finished);
     const client = await this.pool.connect();
+    // A connection that drops mid-transaction also emits 'error' on the
+    // client; the failing query rejects too, so just keep it from crashing.
+    const onError = () => {};
+    client.on('error', onError);
+    let failed: Error | undefined;
     try {
       await client.query('begin');
       const { eventId } = await new Ingest(client).loadTree(tree);
@@ -68,10 +103,12 @@ export class SyncWorker {
       await client.query('commit');
       this.log(`${ev.name} (${ev.season}): loaded, ${this.isu.requests - before} ISU requests${complete ? ', complete' : ''}`);
     } catch (err) {
-      await client.query('rollback');
+      failed = err as Error;
+      await client.query('rollback').catch(() => {});
       throw err;
     } finally {
-      client.release();
+      client.off('error', onError);
+      client.release(failed && isConnectionError(failed) ? failed : undefined); // a broken connection is discarded
     }
   }
 
@@ -193,3 +230,10 @@ export class SyncWorker {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** The database connection went away (vs a problem with the data). */
+export function isConnectionError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  return ['ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'EPIPE', 'ECONNREFUSED'].includes(e.code ?? '')
+    || /Connection terminated|not queryable|connection error/i.test(e.message ?? '');
+}

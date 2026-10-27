@@ -24,6 +24,7 @@ struct EventsView: View {
                 .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)
+            .tabBarHidesOnScroll()
             .refreshable { await live.refresh() }
         }
         .background(Theme.ground)

@@ -32,6 +32,7 @@ struct HeatView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
+            .tabBarHidesOnScroll()
             .refreshable { await live.refresh() }
         }
         .screen(title: live.value?.heat.name ?? "Heat")

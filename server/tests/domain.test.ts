@@ -5,6 +5,7 @@ import { normalizeEntries, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
 import { summarize } from '../src/domain/summary.js';
+import { isConnectionError } from '../src/sync/worker.js';
 import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
 import { WORLDS, WT1_2026, placeHeats, round, tree } from './fixtures.js';
 
@@ -138,5 +139,14 @@ describe('athlete race labels', () => {
     expect(medal('Final B', 1)).toBeNull();
     expect(medal('Final A', 4)).toBeNull();
     expect(medal('Heat 1', 1)).toBeNull();
+  });
+});
+
+describe('sync retries', () => {
+  it('tells a dropped database connection from bad data', () => {
+    expect(isConnectionError(Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }))).toBe(true);
+    expect(isConnectionError(new Error('Connection terminated unexpectedly'))).toBe(true);
+    expect(isConnectionError(new Error('Client has encountered a connection error and is not queryable'))).toBe(true);
+    expect(isConnectionError(new Error('null value in column "distance" violates not-null constraint'))).toBe(false);
   });
 });

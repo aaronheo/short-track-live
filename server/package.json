@@ -11,12 +11,14 @@
     "backfill": "tsx src/sync/run.ts --backfill-only",
     "dev": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "start": "tsx src/main.ts"
+    "test": "vitest run --no-file-parallelism",
+    "start": "tsx src/main.ts",
+    "backfill:history": "tsx src/sync/run.ts --all-history"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
+    "openai": "^7.45.0",
     "pg": "^8.23.1",
     "tsx": "^4.23.15"
   },

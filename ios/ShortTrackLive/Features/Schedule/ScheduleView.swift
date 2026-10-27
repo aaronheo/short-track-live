@@ -32,6 +32,7 @@ struct ScheduleView: View {
                         }
                     }
                     .scrollIndicators(.hidden)
+                    .tabBarHidesOnScroll()
                     .refreshable { await live.refresh() }
                     .onAppear {
                         if let target = selected?.items.first(where: { $0.state == .live })?.id {
@@ -76,20 +77,19 @@ struct ScheduleView: View {
         .padding(.bottom, 14)
     }
 
+    /// Venue time or the phone's time, as a two-option toggle. Hidden when
+    /// they're the same.
+    @ViewBuilder
     private func zoneMenu(_ zone: TimeZone) -> some View {
-        Menu {
-            Picker("Times", selection: $venueTime) {
-                Text("Venue time · \(Fmt.zoneName(zone))").tag(true)
-                Text("Your time · \(Fmt.zoneName(.current))").tag(false)
+        if zone.secondsFromGMT() != TimeZone.current.secondsFromGMT() {
+            Picker("Show times in", selection: $venueTime) {
+                Text("Venue · \(Fmt.zoneName(zone))").tag(true)
+                Text("My time · \(Fmt.zoneName(.current))").tag(false)
             }
-        } label: {
-            HStack(spacing: 4) {
-                Text(venueTime ? "Venue time · \(Fmt.zoneName(zone))" : "Your time · \(Fmt.zoneName(.current))")
-                Image(systemName: "chevron.down").font(.caption.weight(.bold))
-            }
-            .font(.subheadline.weight(.semibold))
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .sensoryFeedback(.selection, trigger: venueTime)
         }
-        .accessibilityLabel(venueTime ? "Times shown in venue time. Change to your time" : "Times shown in your time. Change to venue time")
     }
 
     /// The live day, else today at the venue, else the first day.

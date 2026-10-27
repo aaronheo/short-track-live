@@ -165,4 +165,58 @@ struct NavigationTests {
         model.openRound(35, event: "wt1")
         #expect(model.path == [.event("wt1"), .round(35)])
     }
+
+    @Test func askLinksOpenOnTopOfTheConversation() {
+        let model = AppModel()
+        model.openAsk("Who won?")
+        #expect(model.tab == .search)
+        #expect(model.searchPath == [.ask("Who won?")])
+        #expect(model.openFromAsk(URL(string: "shorttrack://athlete/251")!))
+        #expect(model.openFromAsk(URL(string: "shorttrack://heat/93")!))
+        #expect(!model.openFromAsk(URL(string: "https://www.isu.org")!))
+        #expect(!model.openFromAsk(URL(string: "shorttrack://athlete/abc")!))
+        #expect(model.searchPath == [.ask("Who won?"), .athlete(251), .heat(93)])
+    }
+
+    @Test func conversationSurvivesLayoutSwitch() {
+        let model = AppModel()
+        model.openAsk("Who won?")
+        _ = model.openFromAsk(URL(string: "shorttrack://athlete/251")!)
+        model.setSplit(true)
+        #expect(model.searchQuestion == "Who won?")
+        #expect(model.searchAthlete == nil)
+        #expect(model.searchDetailPath == [.athlete(251)])
+        model.setSplit(false)
+        #expect(model.searchPath == [.ask("Who won?"), .athlete(251)])
+    }
+
+    @Test func openingAnAthleteEndsTheConversationPane() {
+        let model = AppModel()
+        model.setSplit(true)
+        model.openAsk("Who won?")
+        model.openAthlete(251)
+        #expect(model.searchQuestion == nil)
+        #expect(model.searchAthlete == 251)
+    }
+}
+
+struct AskTextTests {
+    @Test func namesAreNotQuestions() {
+        for name in ["Sarault", "van", "Kim Gil-li", "Steven Dubois", "Jens van 't Wout"] {
+            #expect(!AskText.looksLikeQuestion(name), "\(name)")
+        }
+    }
+
+    @Test func questions() {
+        for question in ["Who won the 500?", "dubois?", "how fast is Dubois", "fastest 500 m time ever",
+                         "Did Canada win the relay", "compare Dubois and Sarault"] {
+            #expect(AskText.looksLikeQuestion(question), "\(question)")
+        }
+    }
+
+    @Test func answersKeepLinksAndBullets() {
+        let text = AskText.attributed("**Gold** for [Sarault](shorttrack://athlete/7)\n- 500 m\n- 1000 m")
+        #expect(String(text.characters) == "Gold for Sarault\n•  500 m\n•  1000 m")
+        #expect(text.runs.contains { $0.link == URL(string: "shorttrack://athlete/7") })
+    }
 }

@@ -35,6 +35,7 @@ struct RoundView: View {
                 .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)
+            .tabBarHidesOnScroll()
             .refreshable { await live.refresh() }
         }
         .screen(title: live.value?.round.name ?? "Round")
@@ -70,6 +71,7 @@ struct RoundView: View {
 private struct RoundHeader: View {
     let data: RoundResponse
     let pick: (Int) -> Void
+    @AppStorage("scheduleInVenueTime") private var venueTime = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -90,12 +92,14 @@ private struct RoundHeader: View {
         }
     }
 
+    /// "Quarterfinals · Fri 23 · 16:41 PT", in venue time or the phone's, as chosen on the schedule.
     private var subtitle: String {
-        let zone = TimeZone(identifier: data.event.timeZone) ?? .current
+        let venue = TimeZone(identifier: data.event.timeZone) ?? .current
+        let zone = venueTime ? venue : .current
         var parts = [data.round.name]
         if let start = data.round.startsAt {
             parts.append(Fmt.dayLabel(start, in: zone))
-            parts.append("\(data.round.venueTime ?? Fmt.clock(start, in: zone)) \(Fmt.zoneName(zone, at: start))")
+            parts.append("\(Fmt.clock(start, in: zone)) \(Fmt.zoneName(zone, at: start))")
         }
         return parts.joined(separator: " · ")
     }

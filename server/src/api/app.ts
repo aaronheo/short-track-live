@@ -1,5 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
+import type { ChatEvents, ChatMessage } from '../chat/chat.js';
+import { RateLimit } from '../chat/chat.js';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
 import { Athletes, type RaceFilters } from './athletes.js';
@@ -15,6 +17,10 @@ export interface AppOptions {
    * public URL doesn't republish ISU's data to anyone; unset locally.
    */
   token?: string | null;
+  /** Ask (POST /chat); unset when there's no OPENAI_API_KEY. */
+  chat?: { answer(messages: ChatMessage[], events: ChatEvents, signal?: AbortSignal): Promise<void> } | null;
+  /** Ask requests per hour for the whole server. */
+  chatPerHour?: number;
 }
 
 /**
@@ -134,6 +140,42 @@ export function createApp(db: Db, opts: AppOptions = {}) {
       cursor: text(req.query.cursor),
       limit: Number(req.query.limit) || undefined,
     }));
+  }));
+
+  // Ask. Body: { messages: [{ role: 'user' | 'assistant', content }] }, the
+  // whole conversation (nothing is stored). Streams server-sent events:
+  // {type:'step', text}, {type:'delta', text}, {type:'reset'}, then {type:'done'} or {type:'error', message}.
+  const chatLimit = new RateLimit(opts.chatPerHour ?? 60);
+  app.post('/chat', express.json({ limit: '64kb' }), wrap(async (req, res) => {
+    if (!opts.chat) return res.status(503).json({ error: 'Ask isn’t set up on this server.' });
+    const raw: unknown = req.body?.messages;
+    const messages = Array.isArray(raw) ? raw.filter((m): m is ChatMessage =>
+      !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim().length > 0) : [];
+    if (!messages.length || messages.length !== (raw as unknown[]).length || messages.length > 30
+      || messages.at(-1)!.role !== 'user' || messages.some((m) => m.content.length > 4000)) {
+      return res.status(400).json({ error: 'Send the conversation as messages ending with a question.' });
+    }
+    if (!chatLimit.take()) return res.status(429).json({ error: 'That’s a lot of questions. Try again in a bit.' });
+
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+    res.flushHeaders();
+    const send = (event: object) => { res.write(`data: ${JSON.stringify(event)}\n\n`); };
+    const abort = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+    try {
+      await opts.chat.answer(messages, {
+        step: (text) => send({ type: 'step', text }),
+        delta: (text) => send({ type: 'delta', text }),
+        reset: () => send({ type: 'reset' }),
+      }, abort.signal);
+      send({ type: 'done' });
+    } catch (err) {
+      if (!abort.signal.aborted) {
+        console.error(err);
+        send({ type: 'error', message: 'Something went wrong answering that. Try again.' });
+      }
+    }
+    res.end();
   }));
 
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

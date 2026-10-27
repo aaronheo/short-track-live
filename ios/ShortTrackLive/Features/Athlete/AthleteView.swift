@@ -33,6 +33,7 @@ struct AthleteView: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             }
             .scrollIndicators(.hidden)
+            .tabBarHidesOnScroll()
             .refreshable {
                 await live.refresh()
                 await races.refresh()

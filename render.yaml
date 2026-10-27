@@ -21,3 +21,8 @@ services:
         sync: false
       - key: API_TOKEN
         generateValue: true
+      # Ask: OpenAI answers questions from the database. Unset turns it off.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.5

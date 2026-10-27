@@ -9,29 +9,56 @@ struct ShortTrackLiveApp: App {
     }
 }
 
-/// Two tabs: Events and Search (iOS's search tab). Wide windows (iPad, Duo
-/// unfolded: about 626 pt portrait, 890 landscape) get sidebar layouts;
-/// phones get one stack per tab.
+/// Tabs: Events, Settings, and Search (iOS's search tab, which sits apart).
+/// Wide windows (iPad, Duo unfolded: about 626 pt portrait, 890 landscape)
+/// get sidebar layouts; phones get one stack per tab.
 struct RootView: View {
     @State private var model = AppModel()
+    @State private var split = false
+    @AppStorage("appearance") private var appearance = Appearance.system
 
     var body: some View {
-        GeometryReader { geo in
-            let split = geo.size.width >= 600
-            TabView(selection: $model.tab) {
-                Tab("Events", systemImage: "calendar", value: AppTab.events) {
-                    if split { SplitLayout() } else { StackLayout() }
-                }
-                Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                    SearchTab(split: split)
-                }
+        TabView(selection: $model.tab) {
+            Tab("Events", systemImage: "calendar", value: AppTab.events) {
+                if split { SplitLayout() } else { StackLayout() }
             }
-            .onChange(of: split, initial: true) { _, split in model.setSplit(split) }
+            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
+                SettingsView()
+            }
+            Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
+                SearchTab(split: split)
+            }
         }
+        // Width decides the layout (not a GeometryReader around the tabs,
+        // which stops the tab bar from seeing the scrolling).
+        .onGeometryChange(for: Bool.self) { $0.size.width >= 600 } action: { split = $0 }
+        .onChange(of: split, initial: true) { _, split in model.setSplit(split) }
         .environment(model)
         .tint(Theme.link)
+        .preferredColorScheme(appearance.colorScheme)
         .onOpenURL { model.open($0) }
     }
+}
+
+/// The tab bar hides while you scroll down and comes back when you scroll
+/// up or reach the top. Put on each screen's scroll view.
+struct TabBarHidesOnScroll: ViewModifier {
+    @State private var hidden = false
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { old, new in
+                let next = new < 24 ? false : new - old > 6 ? true : new - old < -6 ? false : hidden
+                if next != hidden { withAnimation(.snappy) { hidden = next } }
+            }
+            // .automatic, not .visible: a root screen saying .visible would
+            // keep the bar up over a pushed screen that hides it (Ask).
+            .toolbarVisibility(hidden ? .hidden : .automatic, for: .tabBar)
+    }
+}
+
+extension View {
+    func tabBarHidesOnScroll() -> some View { modifier(TabBarHidesOnScroll()) }
 }
 
 private struct StackLayout: View {
@@ -58,6 +85,8 @@ private struct StackLayout: View {
                         HeatView(id: id).id(id)
                     case .athlete(let id):
                         AthleteView(id: id).id(id)
+                    case .ask(let question):
+                        AskView(question: question).id(question)
                     }
                 }
         }

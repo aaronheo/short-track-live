@@ -22,7 +22,7 @@ export interface HeatRow {
 }
 
 export interface EntryRow {
-  id: number; heat_id: number; rank: number | null; time_ms: number | null; time_text: string | null;
+  id: number; heat_id: number; skater_id: number | null; rank: number | null; time_ms: number | null; time_text: string | null;
   status: string | null; qualification: string | null; start_position: number | null;
   nation: string | null; iso2: string | null; name: string; last: string;
   lap_count: number; last_lap_no: number | null; last_lap_ms: number | null; last_position: number | null; last_gap_ms: number | null;
@@ -36,7 +36,7 @@ export interface ScheduleRow {
 }
 
 const ENTRY_SELECT = `
-  select en.id, en.heat_id, en.rank, en.time_ms, en.time_text, en.status, en.qualification,
+  select en.id, en.heat_id, en.skater_id, en.rank, en.time_ms, en.time_text, en.status, en.qualification,
     en.start_position, en.nation, n.iso2,
     coalesce(s.first_name || ' ' || s.last_name, s.last_name, t.name) as name,
     coalesce(s.last_name, t.name) as last,

@@ -3,7 +3,7 @@
 // and recreates the public schema), e.g.
 //   TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54329/shorttrack_test npm test
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type pg from 'pg';
 import request from 'supertest';
@@ -14,7 +14,7 @@ import { Ingest } from '../src/db/ingest.js';
 import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, tree } from './fixtures.js';
 
 const url = process.env.TEST_DATABASE_URL;
-const MIGRATION = path.resolve(import.meta.dirname, '../../supabase/migrations/0001_init.sql');
+const MIGRATIONS = path.resolve(import.meta.dirname, '../../supabase/migrations');
 // Mid-event in Vancouver: Men 1500 m QF Heat 5 was racing when the fixture was pulled.
 const NOW = new Date('2026-10-23T23:45:00Z');
 
@@ -27,7 +27,9 @@ describe.skipIf(!url)('database + API', () => {
   beforeAll(async () => {
     pool = createPool(url);
     await pool.query('drop schema public cascade; create schema public;');
-    await pool.query(readFileSync(MIGRATION, 'utf8'));
+    for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+      await pool.query(readFileSync(path.join(MIGRATIONS, file), 'utf8'));
+    }
     const ingest = new Ingest(pool);
     for (const slug of [WT1_2026, WT1_2025, OLYMPICS, WORLDS]) await ingest.loadTree(tree(slug));
     app = createApp(pool, { now: () => NOW });
