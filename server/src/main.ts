@@ -15,6 +15,11 @@ const askFrom = (db: typeof pool) => (process.env.OPENAI_API_KEY
     reasoningEffort: (process.env.OPENAI_REASONING_EFFORT ?? 'low') as 'low',
   })
   : null);
+// Names only, never values: shows a misspelled or misplaced key in the deploy log.
+const openAiNames = Object.keys(process.env).filter((k) => /open.?ai/i.test(k)).map((k) => JSON.stringify(k));
+console.log(process.env.OPENAI_API_KEY
+  ? `Ask: on (${process.env.OPENAI_MODEL ?? 'gpt-5.5'})`
+  : `Ask: off, OPENAI_API_KEY is not set (OpenAI variables seen: ${openAiNames.join(', ') || 'none'})`);
 const replayHeat = process.env.REPLAY_HEAT ? Number(process.env.REPLAY_HEAT) : null;
 createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool) }).listen(port, () => console.log(`API on http://localhost:${port}`));
 startSync().catch((err) => {
