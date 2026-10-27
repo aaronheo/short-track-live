@@ -298,3 +298,105 @@ extension JSONDecoder {
         return decoder
     }()
 }
+
+// MARK: - Athletes
+
+struct AthleteHit: Decodable, Hashable, Sendable, Identifiable {
+    let id: Int
+    let name: String
+    let last: String
+    let nat: String?
+    let iso2: String?
+    let gender: String?
+    let races: Int
+}
+
+struct AthleteSearchResponse: Decodable, Sendable {
+    let query: String
+    let results: [AthleteHit]
+}
+
+struct AthleteResponse: Decodable, Sendable {
+    struct Athlete: Decodable, Sendable {
+        let id: Int
+        let name: String
+        let first: String?
+        let last: String
+        let nat: String?
+        let iso2: String?
+        let gender: String?
+    }
+
+    struct Stats: Decodable, Sendable {
+        let races: Int
+        let events: Int
+        let gold: Int
+        let silver: Int
+        let bronze: Int
+        let since: String? // yyyy-MM-dd, the first event we have for them
+    }
+
+    struct Best: Decodable, Hashable, Sendable, Identifiable {
+        let distance: String
+        let time: String
+        let event: String
+        let round: String
+        let heatId: Int
+
+        var id: String { distance }
+    }
+
+    let athlete: Athlete
+    let stats: Stats
+    let bests: [Best]
+}
+
+struct AthleteRace: Decodable, Hashable, Sendable, Identifiable {
+    struct Event: Decodable, Hashable, Sendable {
+        let slug: String
+        let name: String
+        let city: String?
+        let startsOn: String
+        let endsOn: String
+    }
+
+    let entryId: Int
+    let heatId: Int
+    let roundId: Int
+    let season: String
+    let event: Event
+    let distance: String
+    let round: String
+    let day: String
+    let startsAt: Date
+    let rank: Int?
+    let time: String?
+    let badge: String?
+    let status: String?
+    let medal: Int?
+    let team: String?
+
+    var id: Int { entryId }
+}
+
+struct RaceFacet: Decodable, Hashable, Sendable, Identifiable {
+    let value: String
+    let label: String
+    let count: Int
+    let season: String? // events only
+
+    var id: String { value }
+}
+
+struct RaceFacets: Decodable, Sendable {
+    let seasons: [RaceFacet]
+    let events: [RaceFacet]
+    let distances: [RaceFacet]
+}
+
+struct RacesResponse: Decodable, Sendable {
+    let total: Int?
+    let races: [AthleteRace]
+    let nextCursor: String?
+    let facets: RaceFacets?
+}

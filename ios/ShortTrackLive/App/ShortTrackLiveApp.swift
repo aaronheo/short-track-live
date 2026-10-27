@@ -9,16 +9,22 @@ struct ShortTrackLiveApp: App {
     }
 }
 
-/// Wide windows (iPad, Duo unfolded: about 626 pt portrait, 890 landscape)
-/// get the sidebar layout; phones get one stack.
+/// Two tabs: Events and Search (iOS's search tab). Wide windows (iPad, Duo
+/// unfolded: about 626 pt portrait, 890 landscape) get sidebar layouts;
+/// phones get one stack per tab.
 struct RootView: View {
     @State private var model = AppModel()
 
     var body: some View {
         GeometryReader { geo in
             let split = geo.size.width >= 600
-            Group {
-                if split { SplitLayout() } else { StackLayout() }
+            TabView(selection: $model.tab) {
+                Tab("Events", systemImage: "calendar", value: AppTab.events) {
+                    if split { SplitLayout() } else { StackLayout() }
+                }
+                Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
+                    SearchTab(split: split)
+                }
             }
             .onChange(of: split, initial: true) { _, split in model.setSplit(split) }
         }
@@ -50,6 +56,8 @@ private struct StackLayout: View {
                         }
                     case .heat(let id):
                         HeatView(id: id).id(id)
+                    case .athlete(let id):
+                        AthleteView(id: id).id(id)
                     }
                 }
         }

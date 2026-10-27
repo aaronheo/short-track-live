@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { shortCountry } from '../src/domain/codes.js';
-import { shortEventName } from '../src/domain/format.js';
+import { distanceLabel, medal, roundLabel, shortEventName } from '../src/domain/format.js';
 import { normalizeEntries, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
 import { summarize } from '../src/domain/summary.js';
-import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone } from '../src/domain/time.js';
+import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
 import { WORLDS, WT1_2026, placeHeats, round, tree } from './fixtures.js';
 
 describe('time', () => {
@@ -29,6 +29,7 @@ describe('time', () => {
     const d = new Date('2026-10-23T23:41:00Z');
     expect(clock(d, 'America/Los_Angeles')).toBe('16:41');
     expect(dayLabel(d, 'America/Los_Angeles')).toBe('Fri 23');
+    expect(weekdayMonthDay(d, 'America/Los_Angeles')).toBe('Fri Oct 23');
   });
 
   it('parses race times', () => {
@@ -109,5 +110,33 @@ describe('race summary', () => {
       'Fastest lap: Nadalini, 8.64 s on lap 8.',
       'Bozdag ran in the top 3 from lap 2 to lap 11, then dropped to last.',
     ]);
+  });
+});
+
+describe('athlete race labels', () => {
+  it('names the distance the same way at every event', () => {
+    expect(distanceLabel('Men 1000 m', 1000, false)).toBe('1000 m');
+    expect(distanceLabel("Men's 1000m", 1000, false)).toBe('1000 m');
+    expect(distanceLabel('Men 5000 m Relay', 5000, true)).toBe('5000 m Relay');
+    expect(distanceLabel("Women's 3000m Relay", 3000, true)).toBe('3000 m Relay');
+    expect(distanceLabel('Mixed Team Relay', 2000, true)).toBe('Mixed Team Relay');
+  });
+
+  it('says which race of the round it was', () => {
+    expect(roundLabel('Finals', 'Final A')).toBe('Final A');
+    expect(roundLabel('Finals', 'Final')).toBe('Final');
+    expect(roundLabel('Heats', 'Heat 4')).toBe('Heat 4');
+    expect(roundLabel('Semifinals', 'Heat 1')).toBe('Semifinal · Heat 1');
+    expect(roundLabel('Rep. Quarterfinals', 'Heat 2')).toBe('Rep. Quarterfinal · Heat 2');
+    expect(roundLabel('Preliminaries', 'Heat 5')).toBe('Preliminary · Heat 5');
+    expect(roundLabel('Semifinals', 'Semifinal 2')).toBe('Semifinal 2');
+  });
+
+  it('counts podiums in A finals only', () => {
+    expect(medal('Final A', 2)).toBe(2);
+    expect(medal('Final', 1)).toBe(1);
+    expect(medal('Final B', 1)).toBeNull();
+    expect(medal('Final A', 4)).toBeNull();
+    expect(medal('Heat 1', 1)).toBeNull();
   });
 });

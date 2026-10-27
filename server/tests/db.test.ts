@@ -131,6 +131,75 @@ describe.skipIf(!url)('database + API', () => {
     await request(locked).get('/seasons').set('Authorization', 'Bearer secret').expect(200);
   });
 
+  describe('athletes', () => {
+    const jens = async () => {
+      const { body } = await request(app).get('/athletes?q=van%20%27t%20wout').expect(200);
+      return body.results.find((r: { name: string }) => r.name === "Jens Van 't Wout").id as number;
+    };
+    type Race = { entryId: number; startsAt: string; distance: string; season: string; team: string | null; medal: number | null };
+    const all = async (id: number, query: string) => {
+      const races: Race[] = [];
+      let cursor: string | null = null;
+      let total: number | null = null;
+      do {
+        const { body }: { body: { races: Race[]; nextCursor: string | null; total: number | null } } =
+          await request(app).get(`/athletes/${id}/races?${query}&limit=7${cursor ? `&cursor=${cursor}` : ''}`).expect(200);
+        total ??= body.total;
+        races.push(...body.races);
+        cursor = body.nextCursor;
+      } while (cursor);
+      return { races, total };
+    };
+
+    it('finds athletes by any part of the name, most races first', async () => {
+      const { body } = await request(app).get('/athletes?q=van').expect(200);
+      expect(body.results.map((r: { name: string }) => r.name)).toContain("Jens Van 't Wout");
+      const races = body.results.map((r: { races: number }) => r.races);
+      expect(races).toEqual([...races].sort((a: number, b: number) => b - a));
+      expect((await request(app).get('/athletes?q=v').expect(200)).body.results).toEqual([]);
+      expect((await request(app).get('/athletes?q=%25').expect(200)).body.results).toEqual([]);
+    });
+
+    it('pages through every race once, newest first, and oldest first reversed', async () => {
+      const id = await jens();
+      const desc = await all(id, 'sort=desc');
+      expect(desc.races).toHaveLength(desc.total!);
+      expect(new Set(desc.races.map((r) => r.entryId)).size).toBe(desc.total);
+      const times = desc.races.map((r) => r.startsAt);
+      expect(times).toEqual([...times].sort().reverse());
+      const asc = await all(id, 'sort=asc');
+      expect(asc.races.map((r) => r.entryId)).toEqual(desc.races.map((r) => r.entryId).reverse());
+      expect(desc.races.some((r) => r.team)).toBe(true); // relays count
+    });
+
+    it('filters by distance, season and event, with counts for each option', async () => {
+      const id = await jens();
+      const { body } = await request(app).get(`/athletes/${id}/races`).expect(200);
+      const thousand = body.facets.distances.find((d: { value: string }) => d.value === '1000');
+      const only1000 = await all(id, 'distance=1000');
+      expect(only1000.races.every((r) => r.distance === '1000 m')).toBe(true);
+      expect(only1000.total).toBe(thousand.count);
+      const relays = await all(id, 'distance=relay');
+      expect(relays.races.every((r) => r.team)).toBe(true);
+      const season = await all(id, 'season=2025-2026&distance=1000');
+      expect(season.races.every((r) => r.season === '2025/2026' && r.distance === '1000 m')).toBe(true);
+      const first = await request(app).get(`/athletes/${id}/races?event=${WORLDS}`).expect(200);
+      expect(first.body.facets.events.length).toBeGreaterThan(1); // the event filter doesn't narrow its own menu
+      expect(first.body.races.every((r: { event: { slug: string } }) => r.event.slug === WORLDS)).toBe(true);
+    });
+
+    it('sums medals from A finals and finds best times', async () => {
+      const id = await jens();
+      const { body } = await request(app).get(`/athletes/${id}`).expect(200);
+      expect(body.athlete).toMatchObject({ name: "Jens Van 't Wout", nat: 'NED', iso2: 'NL', gender: 'Men' });
+      const { races } = await all(id, 'sort=desc');
+      expect(body.stats.races).toBe(races.length);
+      expect(body.stats.gold).toBe(races.filter((r) => r.medal === 1).length);
+      expect(body.bests.map((b: { distance: string }) => b.distance)).toEqual(['500 m', '1000 m', '1500 m']);
+      await request(app).get('/athletes/999999').expect(404);
+    });
+  });
+
   it('answers 304 when nothing changed', async () => {
     const first = await request(app).get(`/events/${WT1_2026}/schedule`).expect(200);
     await request(app).get(`/events/${WT1_2026}/schedule`).set('If-None-Match', first.headers.etag!).expect(304);

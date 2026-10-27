@@ -24,3 +24,34 @@ export function shortEventName(name: string): string {
     .trim();
   return short || name;
 }
+
+/**
+ * What an athlete's race list shows for a competition: "1000 m" for
+ * individual races (ISU writes "Men 1000 m" or, at the Olympics, "Men's
+ * 1000m"), the relay's name without the gender for relays ("5000 m Relay",
+ * "Mixed Team Relay").
+ */
+export function distanceLabel(competition: string, distanceM: number | null, relay: boolean): string {
+  if (!relay && distanceM) return `${distanceM} m`;
+  return competition
+    .replace(/^(Men|Women)('s)?\s+/i, '')
+    .replace(/^Mixed's\s+/i, 'Mixed ')
+    .replace(/(\d+)\s*m\b/i, '$1 m')
+    .trim();
+}
+
+/**
+ * "Final", "Final A", "Heat 4", "Semifinal · Heat 1", "Semifinal 2"
+ * (Olympic heat names already say the round).
+ */
+export function roundLabel(round: string, heat: string): string {
+  if (/^final/i.test(heat)) return heat;
+  const single = round.replace(/Preliminaries/i, 'Preliminary').replace(/(\w)s\b/g, '$1');
+  if (/^heats?$/i.test(round) || heat.toLowerCase().startsWith(single.toLowerCase())) return heat;
+  return `${single} · ${heat}`;
+}
+
+/** 1, 2 or 3 for a podium place in an A final (or a single final); else null. */
+export function medal(heat: string, rank: number | null): number | null {
+  return rank != null && rank <= 3 && /^final( a\b|$)/i.test(heat.trim()) ? rank : null;
+}

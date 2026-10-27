@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
+import { Athletes, type RaceFilters } from './athletes.js';
 import { Repo } from './repo.js';
 import { dayOfEvent, eventSummary, heatView, onTheIce, roundView, scheduleView, type EventsResponse } from './views.js';
 
@@ -105,6 +106,34 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     const round = heat ? await repo.round(heat.round_id) : null;
     if (!heat || !round) return res.status(404).json({ error: 'Unknown heat' });
     res.json(heatView(round, heat, await repo.entriesForHeat(heat.id), await repo.lapsForHeat(heat.id)));
+  }));
+
+  const athletes = new Athletes(db);
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+  app.get('/athletes', wrap(async (req, res) => {
+    const q = text(req.query.q) ?? '';
+    res.json({ query: q, results: q.length >= 2 ? await athletes.search(q) : [] });
+  }));
+
+  app.get('/athletes/:id', wrap(async (req, res) => {
+    const view = await athletes.athlete(Number(req.params.id));
+    if (!view) return res.status(404).json({ error: 'Unknown athlete' });
+    res.json(view);
+  }));
+
+  // ?season=2025-2026&event=<slug>&distance=500|1000|1500|relay&sort=asc|desc&cursor=…&limit=30
+  app.get('/athletes/:id/races', wrap(async (req, res) => {
+    const filters: RaceFilters = {
+      season: text(req.query.season)?.replace('-', '/') ?? null,
+      event: text(req.query.event),
+      distance: text(req.query.distance),
+    };
+    res.json(await athletes.races(Number(req.params.id), filters, {
+      sort: req.query.sort === 'asc' ? 'asc' : 'desc',
+      cursor: text(req.query.cursor),
+      limit: Number(req.query.limit) || undefined,
+    }));
   }));
 
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

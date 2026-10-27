@@ -4,6 +4,11 @@ enum Route: Hashable {
     case event(String) // schedule
     case round(Int)
     case heat(Int)
+    case athlete(Int)
+}
+
+enum AppTab: Hashable {
+    case events, search
 }
 
 /// Navigation state for both layouts. On a phone everything is one stack
@@ -12,12 +17,20 @@ enum Route: Hashable {
 /// Switching layouts (rotating, resizing) carries the position across.
 @MainActor @Observable
 final class AppModel {
-    // Phone
+    var tab: AppTab = .events
+
+    // Events tab. Phone:
     var path: [Route] = []
-    // Wide
+    // Wide:
     var sidebarPath: [Route] = []
     var detailRound: Int?
     var detailPath: [Route] = []
+
+    // Search tab. Phone: one stack (athlete → heat). Wide: results in the
+    // sidebar, the athlete in the detail.
+    var searchPath: [Route] = []
+    var searchAthlete: Int?
+    var searchDetailPath: [Route] = []
 
     private(set) var isSplit = false
     /// The round on screen, after any switch with the round chips; the
@@ -34,8 +47,22 @@ final class AppModel {
             detailRound = path.lazy.compactMap { if case .round(let id) = $0 { id } else { nil } }.last
             detailPath = path.filter { if case .heat = $0 { true } else { false } }
             if detailRound == nil { detailPath = [] }
+            searchAthlete = searchPath.lazy.compactMap { if case .athlete(let id) = $0 { id } else { nil } }.last
+            searchDetailPath = searchAthlete == nil ? [] : Array(searchPath.drop { if case .athlete = $0 { false } else { true } }.dropFirst())
         } else {
             path = sidebarPath + (detailRound.map { [Route.round($0)] } ?? []) + detailPath
+            searchPath = (searchAthlete.map { [Route.athlete($0)] } ?? []) + searchDetailPath
+        }
+    }
+
+    /// From search results (or a recent athlete).
+    func openAthlete(_ id: Int) {
+        tab = .search
+        if isSplit {
+            searchAthlete = id
+            searchDetailPath = []
+        } else {
+            searchPath = [.athlete(id)]
         }
     }
 
@@ -68,9 +95,14 @@ final class AppModel {
         if isSplit { detailPath.append(.heat(id)) } else { path.append(.heat(id)) }
     }
 
-    /// shorttrack://event/<slug>, shorttrack://round/<id>, shorttrack://heat/<id>
+    /// shorttrack://event/<slug>, shorttrack://round/<id>, shorttrack://heat/<id>, shorttrack://athlete/<id>
     func open(_ url: URL) {
         guard url.scheme == "shorttrack", let kind = url.host(), let value = url.pathComponents.dropFirst().first else { return }
+        if kind == "athlete" {
+            if let id = Int(value) { openAthlete(id) }
+            return
+        }
+        tab = .events
         switch kind {
         case "event": openEvent(value)
         case "round": if let id = Int(value) { openRound(id) }

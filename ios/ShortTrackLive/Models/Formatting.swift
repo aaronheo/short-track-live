@@ -73,8 +73,24 @@ enum Fmt {
     /// "Seoul, South Korea": the system's short country name rather than
     /// ISU's ("Republic of Korea").
     static func place(_ event: EventSummary) -> String {
-        let country = event.iso2.flatMap { $0 == "CN" ? "China" : Locale(identifier: "en_US").localizedString(forRegionCode: $0) }
-            ?? event.countryName
-        return [event.city, country].compactMap { $0 }.joined(separator: ", ")
+        [event.city, country(iso2: event.iso2, fallback: event.countryName)].compactMap { $0 }.joined(separator: ", ")
+    }
+
+    /// "South Korea", "Netherlands"; the fallback (ISU's name or code) when there's no ISO code.
+    static func country(iso2: String?, fallback: String?) -> String? {
+        iso2.flatMap { $0 == "CN" ? "China" : Locale(identifier: "en_US").localizedString(forRegionCode: $0) } ?? fallback
+    }
+
+    /// "2025-10-09" → "Oct 2025"
+    static func monthYear(_ text: String) -> String? {
+        guard let c = day(text), let m = c.month, let y = c.year else { return nil }
+        return "\(monthName(m)) \(y)"
+    }
+
+    /// "Oct 23–25, 2026" (a date range with its year).
+    static func dateRangeWithYear(_ start: String, _ end: String) -> String {
+        let range = dateRange(start, end)
+        guard let year = day(end)?.year, !range.contains(",") else { return range }
+        return "\(range), \(year)"
     }
 }

@@ -93,6 +93,12 @@ export function dayLabel(date: Date, tz: string): string {
   return `${p.wd} ${Number(p.d)}`;
 }
 
+/** "Sun Oct 25" in `tz`. */
+export function weekdayMonthDay(date: Date, tz: string): string {
+  return new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' })
+    .format(date).replace(',', '');
+}
+
 /** "1:24.537" → 84537 ms, "+0.520" → 520; "PEN", "no time", "" → null. */
 export function millis(text: string | null | undefined): number | null {
   const m = /^[+-]?(?:(\d+):)?(\d+)\.(\d{1,3})$/.exec((text ?? '').trim());

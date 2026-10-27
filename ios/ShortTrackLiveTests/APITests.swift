@@ -65,11 +65,37 @@ struct DecodingTests {
     }
 }
 
+struct AthleteDecodingTests {
+    @Test func search() throws {
+        let search: AthleteSearchResponse = try fixture("athlete-search")
+        #expect(search.results.first?.name == "Jens Van 't Wout")
+        #expect(search.results.first?.races == 115)
+    }
+
+    @Test func athlete() throws {
+        let athlete: AthleteResponse = try fixture("athlete")
+        #expect(athlete.athlete.iso2 == "NL")
+        #expect(athlete.stats.gold + athlete.stats.silver + athlete.stats.bronze == 20)
+        #expect(athlete.bests.map(\.distance) == ["500 m", "1000 m", "1500 m"])
+    }
+
+    @Test func racesPage() throws {
+        let page: RacesResponse = try fixture("athlete-races")
+        #expect(page.total == 115)
+        #expect(page.races.count == 5)
+        #expect(page.nextCursor != nil)
+        #expect(page.races.first?.medal == 1)
+        #expect(page.facets?.distances.map(\.value) == ["500", "1000", "1500", "relay"])
+    }
+}
+
 struct FormattingTests {
     @Test func dateRanges() {
         #expect(Fmt.dateRange("2026-10-23", "2026-10-25") == "Oct 23–25")
         #expect(Fmt.dateRange("2026-10-30", "2026-11-01") == "Oct 30 – Nov 1")
         #expect(Fmt.dateBlock("2026-11-06") == ("NOV", "6"))
+        #expect(Fmt.dateRangeWithYear("2026-10-23", "2026-10-25") == "Oct 23–25, 2026")
+        #expect(Fmt.monthYear("2025-10-09") == "Oct 2025")
     }
 
     @Test func seasons() {
@@ -111,6 +137,27 @@ struct NavigationTests {
         model.open(URL(string: "shorttrack://round/35")!)
         model.open(URL(string: "shorttrack://heat/93")!)
         #expect(model.path == [.event("isu-short-track-world-tour-1"), .round(35), .heat(93)])
+    }
+
+    @Test func athleteSurvivesLayoutSwitch() {
+        let model = AppModel()
+        model.openAthlete(251)
+        model.searchPath.append(.heat(93))
+        #expect(model.tab == .search)
+        model.setSplit(true)
+        #expect(model.searchAthlete == 251)
+        #expect(model.searchDetailPath == [.heat(93)])
+        model.setSplit(false)
+        #expect(model.searchPath == [.athlete(251), .heat(93)])
+    }
+
+    @Test func athleteDeepLinkSwitchesTab() {
+        let model = AppModel()
+        model.open(URL(string: "shorttrack://athlete/251")!)
+        #expect(model.tab == .search)
+        #expect(model.searchPath == [.athlete(251)])
+        model.open(URL(string: "shorttrack://round/35")!)
+        #expect(model.tab == .events)
     }
 
     @Test func onTheIceOpensTheScheduleUnderneath() {

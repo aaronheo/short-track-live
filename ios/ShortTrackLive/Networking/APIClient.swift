@@ -49,10 +49,14 @@ actor APIClient {
     }
 
     /// The decoded response, or nil when it hasn't changed since the last call
-    /// for this path.
-    func get<T: Decodable & Sendable>(_ path: String, as type: T.Type = T.self) async throws -> T? {
-        var request = URLRequest(url: baseURL.appending(path: path))
-        if let etag = etags[path] { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+    /// for this path. `cached: false` always fetches (paged lists).
+    func get<T: Decodable & Sendable>(_ path: String, query: [URLQueryItem] = [], cached: Bool = true,
+                                      as type: T.Type = T.self) async throws -> T? {
+        var url = baseURL.appending(path: path)
+        if !query.isEmpty { url.append(queryItems: query) }
+        let key = url.absoluteString
+        var request = URLRequest(url: url)
+        if cached, let etag = etags[key] { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         let (data, response) = try await session.data(for: request)
         let http = response as? HTTPURLResponse
@@ -61,7 +65,7 @@ actor APIClient {
             return nil
         case 200:
             let value = try JSONDecoder.api.decode(T.self, from: data)
-            etags[path] = http?.value(forHTTPHeaderField: "ETag")
+            if cached { etags[key] = http?.value(forHTTPHeaderField: "ETag") }
             return value
         case let code:
             throw APIError.status(code)
@@ -71,6 +75,6 @@ actor APIClient {
     /// Forget the ETag so the next call returns a value (a screen that was
     /// recreated has nothing to fall back on).
     func reset(_ path: String) {
-        etags[path] = nil
+        etags[baseURL.appending(path: path).absoluteString] = nil
     }
 }
