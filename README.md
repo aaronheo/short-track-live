@@ -24,7 +24,7 @@ Apply the files in `supabase/migrations/` to the database once, in order, then:
 | Command | What it does |
 | --- | --- |
 | `npm run backfill` | Stores every event of the current and previous season (about 25 min the first time; finished events are never fetched again) |
-| `npm run backfill:history` | Stores every season ISU lists, newest first (hours). Stops once the database passes `BACKFILL_MAX_DB_MB` (default 400, under Supabase's 500 MB free tier); run it again to pick up where it stopped |
+| `npm run backfill:history` | Stores every season from 2019/20 on, newest first (about an hour). ISU's results before 2019/20 are fragments, one race per round, so they're left out. Stops once the database passes `BACKFILL_MAX_DB_MB` (default 400, under Supabase's 500 MB free tier); run it again to pick up where it stopped |
 | `npm run dev` | API on port 4310 plus the sync worker (polls ISU only while an event is live) |
 | `npm run api` | API only |
 | `REPLAY_HEAT=<heat id> npm run api` | Replays a finished heat lap by lap as if it were live, for testing the live screens |
