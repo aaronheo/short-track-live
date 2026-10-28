@@ -159,11 +159,18 @@ private struct HeatResultRow: View {
 private struct PositionChart: View {
     let chart: HeatResponse.Chart
     let notes: [String]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// When the lap-by-lap drawing started; nil when it isn't playing.
+    @State private var startedAt: Date?
+    /// Played through once (or never animated), so later live laps just appear.
+    @State private var played = false
+
+    private static let secondsPerLap = 0.26
 
     private struct Point: Identifiable {
         let skater: String
-        let lap: Int
-        let position: Int
+        let lap: Double
+        let position: Double
         var id: String { "\(skater)-\(lap)" }
     }
 
@@ -184,81 +191,154 @@ private struct PositionChart: View {
         chart.series.flatMap { $0.positions.compactMap { $0 } }.max() ?? chart.series.count
     }
 
+    /// How far the drawing has got, in laps: 1 (the first crossing) up to the last lap.
+    private func progress(at date: Date) -> Double {
+        let end = Double(max(1, chart.laps))
+        guard let startedAt else { return played || reduceMotion ? end : 1 }
+        return min(end, 1 + date.timeIntervalSince(startedAt) / Self.secondsPerLap)
+    }
+
+    /// A skater's line up to `lap`, ending partway to the next crossing.
+    private func points(_ s: HeatResponse.Chart.Series, upTo lap: Double) -> [Point] {
+        let known = s.positions.enumerated().compactMap { i, pos in pos.map { (lap: Double(i + 1), pos: Double($0)) } }
+        var points: [Point] = []
+        for (k, cur) in known.enumerated() {
+            if cur.lap <= lap {
+                points.append(Point(skater: s.last, lap: cur.lap, position: cur.pos))
+                continue
+            }
+            if k > 0, known[k - 1].lap < lap {
+                let prev = known[k - 1]
+                let f = (lap - prev.lap) / (cur.lap - prev.lap)
+                points.append(Point(skater: s.last, lap: lap, position: prev.pos + (cur.pos - prev.pos) * f))
+            }
+            break
+        }
+        return points
+    }
+
+    private func play() {
+        played = false
+        let start = Date.now
+        startedAt = start
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Double(max(0, chart.laps - 1)) * Self.secondsPerLap))
+            if startedAt == start {
+                startedAt = nil
+                played = true
+            }
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Position by lap")
-                .font(.headline)
-                .foregroundStyle(Theme.ink)
-                .padding(.horizontal, 8)
-            Chart {
-                ForEach(ordered) { series in
-                    let points = series.positions.enumerated().compactMap { index, pos in
-                        pos.map { Point(skater: series.last, lap: index + 1, position: $0) }
+        TimelineView(.animation(paused: startedAt == nil)) { context in
+            let lap = progress(at: context.date)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 4) {
+                    Text("Position by lap")
+                        .font(.headline)
+                        .foregroundStyle(Theme.ink)
+                    Spacer(minLength: 8)
+                    Text("Lap \(min(chart.laps, Int(lap))) of \(chart.laps)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.muted)
+                    Button { play() } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Theme.link)
+                            .frame(width: 44, height: 44)
+                            .contentShape(.rect)
                     }
-                    ForEach(points) { point in
-                        LineMark(x: .value("Lap", point.lap), y: .value("Position", point.position), series: .value("Skater", point.skater))
-                            .foregroundStyle(color(series))
-                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    }
-                    if let end = points.last {
-                        PointMark(x: .value("Lap", end.lap), y: .value("Position", end.position))
-                            .foregroundStyle(color(series))
-                            .symbolSize(40)
-                            .annotation(position: .trailing, alignment: .leading, spacing: 6,
-                                        overflowResolution: .init(x: .disabled, y: .disabled)) {
-                                Text(series.last)
-                                    .font(.caption.weight(rank(series) > 0 ? .semibold : .regular))
-                                    .foregroundStyle(rank(series) > 0 ? Theme.ink : Theme.muted)
-                                    .fixedSize()
-                            }
-                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Replay position by lap")
                 }
-            }
-            .chartYScale(domain: .automatic(includesZero: false, reversed: true))
-            .chartXScale(domain: 1...max(2, chart.laps), range: .plotDimension(startPadding: 6, endPadding: 10))
-            .chartYAxis {
-                AxisMarks(position: .leading, values: Array(1...max(1, maxPosition))) { _ in
-                    AxisGridLine().foregroundStyle(Theme.divider)
-                    AxisValueLabel().foregroundStyle(Theme.muted)
+                .padding(.leading, 8)
+                chartView(upTo: lap)
+                ForEach(notes, id: \.self) { note in
+                    Text(note)
+                        .font(.caption)
+                        .lineSpacing(2)
+                        .foregroundStyle(Theme.muted)
+                        .padding(.horizontal, 8)
                 }
-            }
-            // Lap numbers drawn by hand: Charts' own axis drops the last lap's
-            // label, and the last lap is the one that matters.
-            .chartXAxis(.hidden)
-            .chartOverlay { proxy in
-                GeometryReader { geo in
-                    if let anchor = proxy.plotFrame {
-                        let plot = geo[anchor]
-                        ForEach(xTicks, id: \.self) { lap in
-                            if let x = proxy.position(forX: lap) {
-                                Text("\(lap)")
-                                    .font(.caption2)
-                                    .monospacedDigit()
-                                    .foregroundStyle(Theme.muted)
-                                    .position(x: plot.minX + x, y: plot.maxY + 14)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 20)
-            .chartLegend(.hidden)
-            .frame(height: CGFloat(max(5, maxPosition)) * 24 + 40)
-            .padding(.leading, 8)
-            .padding(.trailing, 84) // room for the names at the end of each line
-            .accessibilityLabel(accessibilitySummary)
-            ForEach(notes, id: \.self) { note in
-                Text(note)
-                    .font(.caption)
-                    .lineSpacing(2)
-                    .foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 8)
             }
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
+        // Draws itself the first time it's mostly on screen.
+        .onScrollVisibilityChange(threshold: 0.6) { visible in
+            if visible, !played, startedAt == nil, !reduceMotion { play() }
+        }
+    }
+
+    private func chartView(upTo lap: Double) -> some View {
+        Chart {
+            // Every place from the start, so the axis stays put while the lines grow.
+            PointMark(x: .value("Lap", 1.0), y: .value("Position", 1.0)).opacity(0)
+            PointMark(x: .value("Lap", 1.0), y: .value("Position", Double(maxPosition))).opacity(0)
+            ForEach(ordered) { series in
+                let points = points(series, upTo: lap)
+                ForEach(points) { point in
+                    LineMark(x: .value("Lap", point.lap), y: .value("Position", point.position), series: .value("Skater", point.skater))
+                        .foregroundStyle(color(series))
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                }
+                if let end = points.last {
+                    PointMark(x: .value("Lap", end.lap), y: .value("Position", end.position))
+                        .foregroundStyle(color(series))
+                        .symbolSize(40)
+                        .annotation(position: .trailing, alignment: .leading, spacing: 6,
+                                    overflowResolution: .init(x: .disabled, y: .disabled)) {
+                            HStack(spacing: 4) {
+                                FlagView(iso2: series.iso2, size: 11)
+                                Text(series.last)
+                                    .font(.caption.weight(rank(series) > 0 ? .semibold : .regular))
+                                    .foregroundStyle(rank(series) > 0 ? Theme.ink : Theme.muted)
+                            }
+                            .fixedSize()
+                        }
+                }
+            }
+        }
+        .chartYScale(domain: .automatic(includesZero: false, reversed: true))
+        .chartXScale(domain: 1...Double(max(2, chart.laps)), range: .plotDimension(startPadding: 6, endPadding: 10))
+        .chartYAxis {
+            AxisMarks(position: .leading, values: (1...max(1, maxPosition)).map(Double.init)) { value in
+                AxisGridLine().foregroundStyle(Theme.divider)
+                AxisValueLabel {
+                    if let place = value.as(Double.self) { Text("\(Int(place))") }
+                }
+                .foregroundStyle(Theme.muted)
+            }
+        }
+        // Lap numbers drawn by hand: Charts' own axis drops the last lap's
+        // label, and the last lap is the one that matters.
+        .chartXAxis(.hidden)
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                if let anchor = proxy.plotFrame {
+                    let plot = geo[anchor]
+                    ForEach(xTicks, id: \.self) { tick in
+                        if let x = proxy.position(forX: Double(tick)) {
+                            Text("\(tick)")
+                                .font(.caption2)
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.muted)
+                                .position(x: plot.minX + x, y: plot.maxY + 14)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.bottom, 20)
+        .chartLegend(.hidden)
+        .frame(height: CGFloat(max(5, maxPosition)) * 24 + 40)
+        .padding(.leading, 8)
+        .padding(.trailing, 104) // room for the flags and names at the end of each line
+        .accessibilityLabel(accessibilitySummary)
     }
 
     private var xTicks: [Int] {
