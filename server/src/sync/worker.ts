@@ -13,6 +13,9 @@ const LIVE_EVENT_LIST_EVERY = 30 * 60_000; // ...more often while an event is li
 const HOT_WINDOW = 15 * 60_000;
 // ISU's results before this season are fragments: one race per round, a few skaters in each.
 const HISTORY_FROM = '2019/2020';
+// ISU event ids the backfill leaves out. ISU lists the 2022 Junior Worlds twice;
+// this copy lacks the women's 500 m and 1000 m finals (the other, 4103, is whole).
+const SKIP_EVENTS = new Set([4096]);
 const FINISH_CHECK_EVERY = 10 * 60_000; // a finished event, until all its heats are official
 
 type Log = (msg: string) => void;
@@ -50,6 +53,7 @@ export class SyncWorker {
       const events = await this.isu.events(title);
       this.log(`${title}: ${events.length} events`);
       for (const ev of events) {
+        if (SKIP_EVENTS.has(Number(ev.event_id ?? ev.id))) continue;
         if (opts.maxDbBytes && await this.dbBytes() > opts.maxDbBytes) {
           this.log(`database is over ${Math.round(opts.maxDbBytes / 1e6)} MB; stopping the backfill here`);
           return;

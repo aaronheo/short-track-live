@@ -13,6 +13,8 @@ const EVENT_STATE: Record<string, EventState> = {
 };
 export const eventState = (s: string | null | undefined): EventState => EVENT_STATE[s ?? ''] ?? 'upcoming';
 
+// Events ISU names by their slug, by ISU event id.
+const EVENT_NAMES: Record<number, string> = { 4103: 'ISU World Junior Short Track Speed Skating Championships' }; // "wjc2022"
 const norm = (s: string | null | undefined) => (s ?? '').toLowerCase().replace(/'s\b/g, '').replace(/[^a-z0-9]/g, '');
 
 type Col = [name: string, sqlType: string];
@@ -107,7 +109,7 @@ export class Ingest {
       ['starts_on', 'date'], ['ends_on', 'date'], ['state', 'event_state'],
     ], [{
       isu_id: Number(ev.event_id ?? ev.id), api_id: ev.api_id || null, slug: ev.slug,
-      season_id: seasonIds.get(Number(ev.season_id)), name: ev.name, series: ev.event_sub_type_name ?? null,
+      season_id: seasonIds.get(Number(ev.season_id)), name: EVENT_NAMES[Number(ev.event_id ?? ev.id)] ?? ev.name, series: ev.event_sub_type_name ?? null,
       city: ev.city ?? null, country_code: ev.country_code || null, time_zone: timeZone,
       starts_on: isuLocalDate(ev.from_date), ends_on: isuLocalDate(ev.to_date), state: eventState(ev.state),
     }]);
