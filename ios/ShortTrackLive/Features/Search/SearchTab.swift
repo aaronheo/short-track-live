@@ -6,18 +6,34 @@ import SwiftUI
 struct SearchTab: View {
     @Environment(AppModel.self) private var model
     let split: Bool
+    /// The tab bar runs down the side (Duo cover screen), so it can't turn
+    /// into the search field at the bottom the way a phone's does.
+    let tabBarAtSide: Bool
     @State private var query = ""
     /// Bumped on Return in the search field. The handler has to sit where
     /// .searchable is: a submit action only reaches fields below it.
     @State private var submits = 0
+    /// The search field is active (keyboard up). Set on switching to this tab.
+    @State private var searching = false
 
     var body: some View {
+        layout
+            .task(id: model.tab) {
+                guard model.tab == .search else { return }
+                // Until the tab is on screen the field ignores being presented.
+                try? await Task.sleep(for: .milliseconds(100))
+                searching = true
+            }
+    }
+
+    @ViewBuilder
+    private var layout: some View {
         @Bindable var model = model
         if split {
             NavigationSplitView {
                 SearchResults(query: query, submits: submits)
                     .navigationTitle("Search")
-                    .searchable(text: $query, placement: .sidebar, prompt: "Search or ask")
+                    .searchable(text: $query, isPresented: $searching, placement: .sidebar, prompt: "Search or ask")
                     .onSubmit(of: .search) { submits += 1 }
                     .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
             } detail: {
@@ -40,7 +56,8 @@ struct SearchTab: View {
             NavigationStack(path: $model.searchPath) {
                 SearchResults(query: query, submits: submits)
                     .navigationTitle("Search")
-                    .searchable(text: $query, prompt: "Search or ask")
+                    .searchable(text: $query, isPresented: $searching, prompt: "Search or ask")
+                    .searchAtBottom(tabBarAtSide)
                     .onSubmit(of: .search) { submits += 1 }
                     .navigationDestination(for: Route.self) { route in destination(route) }
             }
@@ -55,6 +72,20 @@ struct SearchTab: View {
         case .round(let id): RoundView(id: id).id(id)
         case .ask(let question): AskView(question: question).id(question)
         case .event(let slug): ScheduleView(slug: slug).id(slug)
+        }
+    }
+}
+
+private extension View {
+    /// The search field in the bottom bar. Only where the tab bar sits at the
+    /// side: on a phone the tab bar becomes the field, and a second one would
+    /// draw over it.
+    @ViewBuilder
+    func searchAtBottom(_ enabled: Bool) -> some View {
+        if #available(iOS 26, *), enabled {
+            toolbar { DefaultToolbarItem(kind: .search, placement: .bottomBar) }
+        } else {
+            self
         }
     }
 }

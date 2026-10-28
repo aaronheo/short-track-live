@@ -15,6 +15,7 @@ struct ShortTrackLiveApp: App {
 struct RootView: View {
     @State private var model = AppModel()
     @State private var split = false
+    @State private var tabBarAtSide = false
     @AppStorage("appearance") private var appearance = Appearance.system
 
     var body: some View {
@@ -26,13 +27,16 @@ struct RootView: View {
                 SettingsView()
             }
             Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                SearchTab(split: split)
+                SearchTab(split: split, tabBarAtSide: tabBarAtSide)
             }
         }
         // Width decides the layout (not a GeometryReader around the tabs,
         // which stops the tab bar from seeing the scrolling).
         .onGeometryChange(for: Bool.self) { $0.size.width >= 600 } action: { split = $0 }
         .onChange(of: split, initial: true) { _, split in model.setSplit(split) }
+        // The Duo's cover screen puts the status and tab bars down the trailing
+        // edge: an inset on that side only (a landscape phone has both sides inset).
+        .onGeometryChange(for: Bool.self) { $0.safeAreaInsets.trailing > $0.safeAreaInsets.leading + 20 } action: { tabBarAtSide = $0 }
         .environment(model)
         .tint(Theme.link)
         .preferredColorScheme(appearance.colorScheme)

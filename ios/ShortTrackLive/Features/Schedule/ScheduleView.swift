@@ -42,7 +42,14 @@ struct ScheduleView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { zoneMenu(zone) }
+                if #available(iOS 26, *) {
+                    // The segmented control is its own capsule; the bar's glass
+                    // behind it showed as a second outline.
+                    ToolbarItem(placement: .topBarTrailing) { zoneMenu(zone) }
+                        .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) { zoneMenu(zone) }
+                }
             }
         }
         .screen(title: "Schedule")
