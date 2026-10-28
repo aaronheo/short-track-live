@@ -121,6 +121,15 @@ struct Entry: Decodable, Hashable, Sendable, Identifiable {
     let badge: String?
     let lastLap: String?
     let laps: Int
+    /// Relays, on the heat screen: who skated for the team (ISU names them once it's raced).
+    var members: [RelayMember]? = nil
+}
+
+struct RelayMember: Decodable, Hashable, Sendable, Identifiable {
+    let id: Int
+    let name: String
+    /// Surname, or "J. Van 't Wout" when two in the team share one.
+    let short: String
 }
 
 struct HeatBlock: Decodable, Hashable, Sendable, Identifiable {

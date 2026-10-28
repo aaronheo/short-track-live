@@ -129,6 +129,13 @@ private struct HeatResultRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
+                if let members = entry.members, !members.isEmpty {
+                    Text(members.map(\.short).joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(Theme.text3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Skaters: " + members.map(\.name).joined(separator: ", "))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 2) {

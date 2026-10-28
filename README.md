@@ -68,7 +68,7 @@ Tabs: Events, Profile, and Search, where a name finds athletes and a question go
 
 ### Favorites and notifications
 
-Star a skater on their page, or add them in Profile (which also holds light/dark). Favorites stay on the phone. The app asks the server for their races (`GET /favorites/races?skaters=…`, which also writes the notification text) and notifies, if you allow it, when a favorite's race is next on the ice and when its result is official. Profile has a switch for each, so results can stay unspoiled.
+Star a skater on their page, or add them in Profile (which also holds light/dark). Favorites stay on the phone. The app asks the server for their races (`GET /favorites/races?skaters=…`, which also writes the notification text) and notifies, if you allow it, when a favorite's race is next on the ice and when its result is official, relays included. ISU names a relay team's skaters only after the race, so before it a relay counts if the favorite skated that relay for that nation in the past year, and the alert names the team ("Netherlands is up next · Velzeboer's team"). Profile has a switch for each kind, so results can stay unspoiled.
 
 There's no push from the server yet: that needs a paid Apple developer account (APNs). Until then the phone does it. It schedules "up next" for 4 minutes before each heat's planned start, and posts it straight away if the server says the heat is next. Results come whenever the app gets to check: every 30 s while it's open and a favorite is racing, and in background refreshes, which iOS runs when it sees fit (often not for a while).
 
