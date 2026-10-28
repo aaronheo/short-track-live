@@ -165,7 +165,8 @@ private struct PositionChart: View {
     /// Played through once (or never animated), so later live laps just appear.
     @State private var played = false
 
-    private static let secondsPerLap = 0.38
+    /// The whole race draws in this long, whatever the distance.
+    private static let duration = 4.0
 
     private struct Point: Identifiable {
         let skater: String
@@ -195,7 +196,7 @@ private struct PositionChart: View {
     private func progress(at date: Date) -> Double {
         let end = Double(max(1, chart.laps))
         guard let startedAt else { return played || reduceMotion ? end : 1 }
-        return min(end, 1 + date.timeIntervalSince(startedAt) / Self.secondsPerLap)
+        return min(end, 1 + date.timeIntervalSince(startedAt) / Self.duration * (end - 1))
     }
 
     /// A skater's line up to `lap`, ending partway to the next crossing.
@@ -223,7 +224,7 @@ private struct PositionChart: View {
         let start = Date.now
         startedAt = start
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(Double(max(0, chart.laps - 1)) * Self.secondsPerLap))
+            try? await Task.sleep(for: .seconds(Self.duration))
             if startedAt == start {
                 startedAt = nil
                 played = true
