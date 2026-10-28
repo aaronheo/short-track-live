@@ -207,20 +207,33 @@ describe.skipIf(!url)('database + API', () => {
     await request(app).get(`/events/${WT1_2026}/schedule`).set('If-None-Match', first.headers.etag!).expect(304);
   });
   // Last: it drops the Worlds' results.
-  it('settles a finished event a week on, and hides it if ISU is missing results', async () => {
+  it('settles a finished event a week on; keeps one with gaps, leaves out one with no results', async () => {
     const ingest = new Ingest(pool);
     const live = await one<{ id: number }>('select id from event where slug = $1', [WT1_2026]);
-    expect(await ingest.markSynced(live.id)).toEqual({ complete: false, gaps: null });
+    expect(await ingest.markSynced(live.id)).toEqual({ complete: false, gaps: null, noResults: false });
 
     const worlds = await one<{ id: number }>('select id from event where slug = $1', [WORLDS]);
     expect(await ingest.gaps(worlds.id)).toBeNull();
     await pool.query(
-      `update entry set rank = null, time_ms = null, status = null, qualification = null where id = (
+      `update entry set rank = null, time_ms = null, time_text = null, status = null, qualification = null where id = (
          select x.id from entry x join heat h on h.id = x.heat_id join round r on r.id = h.round_id
          join competition c on c.id = r.competition_id where c.event_id = $1 limit 1)`, [worlds.id]);
-    expect(await ingest.markSynced(worlds.id)).toEqual({ complete: true, gaps: '1 skaters without a result' });
-    expect(await one('select incomplete, results_complete from event where id = $1', [worlds.id]))
-      .toEqual({ incomplete: true, results_complete: true });
+    expect(await ingest.markSynced(worlds.id)).toEqual({ complete: true, gaps: '1 skaters without a result', noResults: false });
+    await request(app).get(`/events/${WORLDS}/schedule`).expect(200);
+    const blank = await one<{ id: number }>(
+      `select h.id from heat h join entry x on x.heat_id = h.id where x.rank is null and x.time_ms is null
+         and x.status is null and x.qualification is null and h.round_id in (
+           select r.id from round r join competition c on c.id = r.competition_id where c.event_id = $1)`, [worlds.id]);
+    const heat = await request(app).get(`/heats/${blank.id}`).expect(200);
+    expect(heat.body.results.map((r: { time: string | null }) => r.time)).toContain('No time');
+
+    await pool.query(
+      `update entry set rank = null, time_ms = null, status = null, qualification = null where heat_id in (
+         select h.id from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id where c.event_id = $1)`,
+      [worlds.id]);
+    expect(await ingest.markSynced(worlds.id)).toEqual({ complete: true, gaps: null, noResults: true });
+    expect(await one('select no_results, results_complete from event where id = $1', [worlds.id]))
+      .toEqual({ no_results: true, results_complete: true });
     expect(await one<{ n: number }>('select count(*)::int as n from competition where event_id = $1', [worlds.id])).toEqual({ n: 0 });
     await request(app).get(`/events/${WORLDS}/schedule`).expect(404);
     const { body } = await request(app).get('/seasons/2025-2026/events').expect(200);

@@ -289,26 +289,30 @@ export class Ingest {
   /**
    * A finished event settles a week after it ends: until then ISU keeps
    * entering penalties and renumbering entries (World Tour #1 2026), so it's
-   * fetched again. A settled event is never fetched again. If ISU's results
-   * for it are still incomplete then (see gaps), they're dropped and the event
-   * is hidden; so is an event ISU has no results for at all (cancelled).
+   * fetched again; a settled event never is. Gaps ISU leaves in a settled
+   * event are reported but kept (they show as "No time"); only an event with
+   * no results at all (cancelled, or never published) is left out.
    */
-  async markSynced(eventId: number): Promise<{ complete: boolean; gaps: string | null }> {
+  async markSynced(eventId: number): Promise<{ complete: boolean; gaps: string | null; noResults: boolean }> {
     const res = await this.db.query<{ complete: boolean }>(
       `update event set synced_at = now(), results_complete = (state = 'finished' and ends_on < current_date - $2::int)
        where id = $1 returning results_complete as complete`, [eventId, SETTLE_DAYS]);
     const complete = res.rows[0]?.complete ?? false;
-    if (!complete) return { complete, gaps: null };
-    const gaps = await this.gaps(eventId);
-    const empty = !(await this.db.query('select 1 from competition where event_id = $1 limit 1', [eventId])).rowCount;
-    if (gaps) {
+    if (!complete) return { complete, gaps: null, noResults: false };
+    const noResults = !(await this.db.query(
+      `select 1 from entry x join heat h on h.id = x.heat_id join round r on r.id = h.round_id
+       join competition c on c.id = r.competition_id
+       where c.event_id = $1 and (x.rank is not null or x.time_ms is not null or x.status is not null or x.qualification is not null)
+       limit 1`, [eventId])).rowCount;
+    if (noResults) {
+      // Start lists at most: nothing worth keeping.
       await this.db.query('delete from schedule_item where event_id = $1', [eventId]);
       await this.db.query('delete from competition where event_id = $1', [eventId]);
       await this.db.query(`delete from skater k where not exists (select 1 from entry x where x.skater_id = k.id)
         and not exists (select 1 from relay_member m where m.skater_id = k.id)`);
     }
-    await this.db.query('update event set incomplete = $2 where id = $1', [eventId, gaps != null || empty]);
-    return { complete, gaps };
+    await this.db.query('update event set no_results = $2 where id = $1', [eventId, noResults]);
+    return { complete, gaps: noResults ? null : await this.gaps(eventId), noResults };
   }
 
   /**

@@ -2,7 +2,7 @@
 // Swift models in ios/ShortTrackLive/Models mirror them.
 
 import { QUALIFIED_CODES } from '../domain/codes.js';
-import { gap, raceTime, shortEventName } from '../domain/format.js';
+import { gap, raceTime, shortEventName, shownTime } from '../domain/format.js';
 import type { HeatState } from '../domain/normalize.js';
 import { placesCard, type PlacesCard } from '../domain/places.js';
 import type { QualRule } from '../domain/rules.js';
@@ -96,11 +96,11 @@ export function scheduleView(event: EventRow, rows: ScheduleRow[]): ScheduleResp
   return { event: { ...eventSummary(event), timeZone: event.time_zone }, days: [...days.values()] };
 }
 
-function entryView(e: EntryRow, winnerMs: number | null, running: boolean): EntryView {
+function entryView(e: EntryRow, winnerMs: number | null, running: boolean, state: HeatState): EntryView {
   return {
     id: e.id, athleteId: e.skater_id, rank: running ? e.last_position : e.rank, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2,
     startPosition: e.start_position,
-    time: running ? null : e.time_text,
+    time: running ? null : shownTime(e.time_text, e.status, state),
     gap: !running && e.time_ms != null && winnerMs != null && e.time_ms > winnerMs ? gap(e.time_ms - winnerMs) : null,
     status: e.status, badge: running ? null : e.qualification, lastLap: raceTime(e.last_lap_ms), laps: e.lap_count,
   };
@@ -145,7 +145,7 @@ export function roundView(
       qualified: running ? [] : list.filter((e) => e.qualification && QUALIFIED_CODES.has(e.qualification))
         .map((e) => ({ last: e.last, iso2: e.iso2, badge: e.qualification! })),
       sanctions: running ? null : sanctions(list),
-      entries: list.map((e) => entryView(e, winnerMs, running)),
+      entries: list.map((e) => entryView(e, winnerMs, running, h.state)),
     };
   });
 
@@ -233,7 +233,7 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
 
   return {
     heat: { id: h.id, name: h.name, state: h.state, roundId: r.id, round: r.name, competition: r.competition, event: r.event_name, isRelay: r.is_relay },
-    results: list.map((e) => entryView(e, winnerMs, false)),
+    results: list.map((e) => entryView(e, winnerMs, false, h.state)),
     summary: h.state === 'official' || h.state === 'unofficial' ? summarize(summaryInput) : [],
     chart, lapTable, notes,
   };

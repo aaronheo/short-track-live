@@ -111,9 +111,9 @@ export class SyncWorker {
     try {
       await client.query('begin');
       const { eventId } = await new Ingest(client).loadTree(tree);
-      const { complete, gaps } = await new Ingest(client).markSynced(eventId);
+      const { complete, gaps, noResults } = await new Ingest(client).markSynced(eventId);
       await client.query('commit');
-      const outcome = gaps ? `, incomplete at ISU (${gaps}), hidden` : complete ? ', complete' : '';
+      const outcome = noResults ? ', no results at ISU, left out' : gaps ? `, complete (ISU is missing ${gaps})` : complete ? ', complete' : '';
       this.log(`${ev.name} (${ev.season}): loaded, ${this.isu.requests - before} ISU requests${outcome}`);
     } catch (err) {
       failed = err as Error;

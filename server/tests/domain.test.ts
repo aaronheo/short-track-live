@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { shortCountry, statusCode } from '../src/domain/codes.js';
-import { distanceLabel, medal, roundLabel, shortEventName } from '../src/domain/format.js';
+import { distanceLabel, medal, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
@@ -105,9 +105,12 @@ describe('normalize', () => {
     expect(heatState(h('Scheduled', '', raced))).toBe('unofficial');
     expect(heatState(h('Scheduled', '', raced), true)).toBe('official');
     expect(heatState(h('Scheduled', 'Start List', withdrawn), true)).toBe('official');
-    expect(heatState(h('Scheduled', 'Start List', listed), true)).toBe('start_list');
+    expect(heatState(h('Scheduled', 'Start List', listed))).toBe('start_list');
     expect(heatState(h('Finished', 'Live', raced))).toBe('unofficial');
-    expect(heatState(h('Live', 'Live', raced), true)).toBe('running');
+    expect(heatState(h('Live', 'Live', raced))).toBe('running');
+    // Over is over: a race ISU has no results for shows them as "No time".
+    expect(heatState(h('Scheduled', 'Start List', listed), true)).toBe('official');
+    expect(heatState(h('Live', 'Live', raced), true)).toBe('official');
   });
 
   it('names unnamed heats after their round or their order', () => {
@@ -116,6 +119,13 @@ describe('normalize', () => {
     expect(heatName(' ', 'Quarterfinals', 2, 4)).toBe('Heat 2');
     expect(heatName('', 'Heats', 1, 1)).toBe('Heat 1');
     expect(heatName('Super Final', 'Final', 1, 1)).toBe('Super Final');
+  });
+
+  it('says "No time" only for a race that is over', () => {
+    expect(shownTime('40.064', null, 'official')).toBe('40.064');
+    expect(shownTime(null, null, 'official')).toBe('No time');
+    expect(shownTime(null, 'PEN', 'official')).toBeNull();
+    expect(shownTime(null, null, 'start_list')).toBeNull();
   });
 
   it('reads outcomes written in the time field', () => {

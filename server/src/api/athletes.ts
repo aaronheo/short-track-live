@@ -2,7 +2,7 @@
 // An athlete's races include relays they skated in (relay_member).
 
 import type { Db } from '../db/pool.js';
-import { distanceLabel, medal, raceTime, roundLabel, shortEventName } from '../domain/format.js';
+import { distanceLabel, medal, raceTime, roundLabel, shortEventName, shownTime } from '../domain/format.js';
 import { weekdayMonthDay } from '../domain/time.js';
 
 export interface AthleteHit {
@@ -50,7 +50,7 @@ const fullName = (first: string | null, last: string) => (first ? `${first} ${la
 // One row per race the athlete skated, individual or relay.
 const MINE = `
   select en.id as entry_id, en.rank, en.time_text, en.time_ms, en.qualification, en.status,
-    h.id as heat_id, h.name as heat, coalesce(h.starts_at, e.starts_on::timestamptz) as at,
+    h.id as heat_id, h.name as heat, h.state as heat_state, coalesce(h.starts_at, e.starts_on::timestamptz) as at,
     r.id as round_id, r.name as round, c.name as competition, c.distance_m, c.is_relay,
     e.slug, e.name as event_name, e.city, e.time_zone,
     to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on,
@@ -66,7 +66,7 @@ const MINE = `
 
 interface MineRow {
   entry_id: number; rank: number | null; time_text: string | null; time_ms: number | null;
-  qualification: string | null; status: string | null; heat_id: number; heat: string; at: Date;
+  qualification: string | null; status: string | null; heat_id: number; heat: string; heat_state: string; at: Date;
   round_id: number; round: string; competition: string; distance_m: number | null; is_relay: boolean;
   slug: string; event_name: string; city: string | null; time_zone: string; starts_on: string; ends_on: string;
   season: string; team: string | null;
@@ -214,7 +214,7 @@ function raceView(r: MineRow): AthleteRace {
     round: roundLabel(r.round, r.heat),
     day: weekdayMonthDay(r.at, r.time_zone),
     startsAt: r.at.toISOString(),
-    rank: r.rank, time: r.time_text, badge: r.qualification, status: r.status,
+    rank: r.rank, time: shownTime(r.time_text, r.status, r.heat_state), badge: r.qualification, status: r.status,
     medal: medal(r.heat, r.rank), team: r.is_relay ? r.team : null,
   };
 }

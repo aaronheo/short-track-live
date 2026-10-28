@@ -6,6 +6,16 @@ export function raceTime(ms: number | null | undefined): string | null {
   return min ? `${min}:${sec.padStart(6, '0')}` : sec;
 }
 
+/**
+ * The time to show for a skater: ISU's, or "No time" once the race is over
+ * and ISU has none (a fall, or results it never published). A status (PEN,
+ * DNS) shows instead; a race still to come shows nothing.
+ */
+export function shownTime(timeText: string | null, status: string | null, heatState: string): string | null {
+  const over = heatState === 'official' || heatState === 'unofficial';
+  return timeText ?? (over && !status ? 'No time' : null);
+}
+
 /** 317 → "+0.317" */
 export function gap(ms: number | null | undefined): string | null {
   return ms == null ? null : `+${(ms / 1000).toFixed(3)}`;

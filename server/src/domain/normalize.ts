@@ -21,9 +21,9 @@ export function heatState(
     ?? (h.status === 'Finished' ? 'unofficial' : h.status === 'Live' ? 'running' : 'scheduled');
   // ISU never moved most heats before 2023/24 past "Scheduled", results and all.
   if ((state === 'scheduled' || state === 'start_list') && hasResults(h.event_result_round_heats_competitors)) state = 'unofficial';
-  // Nor marked them official; once the event is over, the results are final.
-  if (eventFinished && state === 'unofficial') state = 'official';
-  return state;
+  // Nor marked them official. Once the event is over every race is: the
+  // results are final, and ones ISU never published show as "No time".
+  return eventFinished ? 'official' : state;
 }
 
 function hasResults(competitors: IsuCompetitor[] | null | undefined): boolean {

@@ -68,9 +68,8 @@ export class Repo {
          to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on, e.state
        from event e join season s on s.id = e.season_id left join nation n on n.code = e.country_code
        where s.title = $1
-         -- ISU lists events it has no results for (cancelled ones, mostly in
-         -- 2020/21), and some it has only part of (Ingest.markSynced).
-         and not e.incomplete
+         -- ISU lists events it has no results for (cancelled ones, mostly in 2020/21).
+         and not e.no_results
          and (e.ends_on >= current_date or exists (select 1 from competition c where c.event_id = e.id))
        order by e.starts_on, e.id`, [seasonTitle]);
     return res.rows;
@@ -80,7 +79,7 @@ export class Repo {
     const res = await this.db.query<EventRow>(
       `select e.id, e.slug, e.name, e.series, e.city, n.name as country_name, n.iso2, e.time_zone,
          to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on, e.state
-       from event e left join nation n on n.code = e.country_code where e.slug = $1 and not e.incomplete`, [slug]);
+       from event e left join nation n on n.code = e.country_code where e.slug = $1 and not e.no_results`, [slug]);
     return res.rows[0] ?? null;
   }
 
