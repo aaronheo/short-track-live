@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { shortCountry } from '../src/domain/codes.js';
+import { shortCountry, statusCode } from '../src/domain/codes.js';
 import { distanceLabel, medal, roundLabel, shortEventName } from '../src/domain/format.js';
-import { competitionName, genderName, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
+import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
 import { summarize } from '../src/domain/summary.js';
@@ -94,6 +94,35 @@ describe('normalize', () => {
     for (const [name, gender, relay, want] of cases) expect(competitionName(name, gender, relay)).toBe(want);
     expect(genderName('Ladies')).toBe('Women');
     expect(genderName('Mixed')).toBe('Mixed');
+  });
+
+  it('takes a heat as raced when it has results, whatever ISU calls it', () => {
+    const raced = [{ final_rank: 1, final_result: '41.200', result_status: '' }] as never;
+    const listed = [{ final_rank: null, final_result: 'no time', result_status: '' }] as never;
+    const withdrawn = [{ final_rank: null, final_result: 'WDR', result_status: '' }] as never;
+    const h = (status: string, result_status: string, event_result_round_heats_competitors: never) =>
+      ({ status, result_status, event_result_round_heats_competitors });
+    expect(heatState(h('Scheduled', '', raced))).toBe('unofficial');
+    expect(heatState(h('Scheduled', '', raced), true)).toBe('official');
+    expect(heatState(h('Scheduled', 'Start List', withdrawn), true)).toBe('official');
+    expect(heatState(h('Scheduled', 'Start List', listed), true)).toBe('start_list');
+    expect(heatState(h('Finished', 'Live', raced))).toBe('unofficial');
+    expect(heatState(h('Live', 'Live', raced), true)).toBe('running');
+  });
+
+  it('names unnamed heats after their round or their order', () => {
+    expect(heatName('', 'Final A', 1, 1)).toBe('Final A');
+    expect(heatName('', 'Finals', 1, 1)).toBe('Final');
+    expect(heatName(' ', 'Quarterfinals', 2, 4)).toBe('Heat 2');
+    expect(heatName('', 'Heats', 1, 1)).toBe('Heat 1');
+    expect(heatName('Super Final', 'Final', 1, 1)).toBe('Super Final');
+  });
+
+  it('reads outcomes written in the time field', () => {
+    expect(statusCode('', 'WDR')).toBe('WDR');
+    expect(statusCode('', 'DQ')).toBe('PEN');
+    expect(statusCode('Did Not Start', '')).toBe('DNS');
+    expect(statusCode('', '1:24.537')).toBeNull();
   });
 
   it('spells out abbreviated rounds', () => {

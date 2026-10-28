@@ -1,6 +1,8 @@
 import type pg from 'pg';
-import { Ingest, eventState } from '../db/ingest.js';
-import type { IsuClient } from '../isu/client.js';
+import { Ingest, SETTLE_DAYS, eventState } from '../db/ingest.js';
+import { competitionName, roundName } from '../domain/normalize.js';
+import { isuLocalDate } from '../domain/time.js';
+import { isRelay, type IsuClient } from '../isu/client.js';
 import type { IsuEvent } from '../isu/types.js';
 
 // Polling policy. ISU only ever gets one request at a time from us (IsuClient
@@ -16,7 +18,8 @@ const HISTORY_FROM = '2019/2020';
 // ISU event ids the backfill leaves out. ISU lists the 2022 Junior Worlds twice;
 // this copy lacks the women's 500 m and 1000 m finals (the other, 4103, is whole).
 const SKIP_EVENTS = new Set([4096]);
-const FINISH_CHECK_EVERY = 10 * 60_000; // a finished event, until all its heats are official
+const FINISH_CHECK_EVERY = 6 * 60 * 60_000; // a just-finished event, fetched whole and fresh
+const PULLED_RECENTLY = 12 * 60 * 60_000; // a finished event still settling isn't fetched again sooner
 
 type Log = (msg: string) => void;
 
@@ -44,9 +47,9 @@ export class SyncWorker {
   }
 
   /**
-   * Store every event of these seasons. Finished events are pulled once (and
-   * from the disk cache if we've seen them) and marked complete; complete
-   * events are skipped. Upcoming events get just their event row.
+   * Store every event of these seasons. Finished events are pulled until
+   * they settle a week after they end (see Ingest.markSynced), then skipped.
+   * Upcoming events get just their event row.
    */
   async backfill(seasonTitles: string[], opts: { maxDbBytes?: number } = {}): Promise<void> {
     for (const title of seasonTitles) {
@@ -60,7 +63,7 @@ export class SyncWorker {
         }
         await this.ingest.upsertEvent(ev);
         if (eventState(ev.state) === 'upcoming') continue;
-        if (await this.isComplete(ev.slug)) continue;
+        if (await this.upToDate(ev.slug)) continue;
         for (let attempt = 1; ; attempt++) {
           try {
             await this.pullWholeEvent(ev);
@@ -94,8 +97,11 @@ export class SyncWorker {
 
   private async pullWholeEvent(ev: IsuEvent): Promise<void> {
     const before = this.isu.requests;
-    const finished = eventState(ev.state) === 'finished';
-    const tree = await this.isu.pullEvent(ev, finished);
+    // Settled events can come from the disk cache; newer ones are fetched
+    // fresh, since ISU keeps correcting results for days after an event.
+    const settled = eventState(ev.state) === 'finished'
+      && Date.parse(isuLocalDate(ev.to_date)) < Date.now() - SETTLE_DAYS * 86_400_000;
+    const tree = await this.isu.pullEvent(ev, settled);
     const client = await this.pool.connect();
     // A connection that drops mid-transaction also emits 'error' on the
     // client; the failing query rejects too, so just keep it from crashing.
@@ -105,9 +111,10 @@ export class SyncWorker {
     try {
       await client.query('begin');
       const { eventId } = await new Ingest(client).loadTree(tree);
-      const complete = await new Ingest(client).markSynced(eventId);
+      const { complete, missing } = await new Ingest(client).markSynced(eventId);
       await client.query('commit');
-      this.log(`${ev.name} (${ev.season}): loaded, ${this.isu.requests - before} ISU requests${complete ? ', complete' : ''}`);
+      const outcome = missing ? `, incomplete (${missing} results missing at ISU), hidden` : complete ? ', complete' : '';
+      this.log(`${ev.name} (${ev.season}): loaded, ${this.isu.requests - before} ISU requests${outcome}`);
     } catch (err) {
       failed = err as Error;
       await client.query('rollback').catch(() => {});
@@ -118,9 +125,12 @@ export class SyncWorker {
     }
   }
 
-  private async isComplete(slug: string): Promise<boolean> {
-    const res = await this.pool.query<{ results_complete: boolean }>('select results_complete from event where slug = $1', [slug]);
-    return res.rows[0]?.results_complete ?? false;
+  /** Settled, or a finished event pulled within the last 12 hours. */
+  private async upToDate(slug: string): Promise<boolean> {
+    const res = await this.pool.query<{ up_to_date: boolean }>(
+      `select results_complete or (state = 'finished' and synced_at > now() - make_interval(secs => $2)) as up_to_date
+       from event where slug = $1`, [slug, PULLED_RECENTLY / 1000]);
+    return res.rows[0]?.up_to_date ?? false;
   }
 
   /** Runs until stop(): event-list refresh, live polling. */
@@ -144,8 +154,13 @@ export class SyncWorker {
     if (now - this.lastEventList >= listEvery) {
       this.lastEventList = now;
       const { current } = await this.seasons();
-      for (const ev of await this.isu.events(current)) await this.ingest.upsertEvent(ev);
+      const events = await this.isu.events(current);
+      for (const ev of events) await this.ingest.upsertEvent(ev);
       this.log(`refreshed ${current} event list`);
+      // Finished events that haven't settled, fetched again for ISU's corrections.
+      for (const ev of events) {
+        if (eventState(ev.state) === 'finished' && !(await this.upToDate(ev.slug))) await this.pullWholeEvent(ev);
+      }
     }
 
     for (const ev of live) {
@@ -195,7 +210,7 @@ export class SyncWorker {
         const rid = ids.get(r.event_result_round_id)!;
         roundIds.set(r.event_result_round_id, rid);
         roundKeys.set(norm(comp.name) + '|' + norm(r.name), rid);
-        named.push({ title: comp.name, label: r.name, roundId: rid });
+        named.push({ title: competitionName(comp.name, comp.gender, isRelay(comp)), label: roundName(r.name), roundId: rid });
       }
     }
     const derived = await this.ingest.withStarts(named);
@@ -226,7 +241,7 @@ export class SyncWorker {
     return [...res.rows, ...pending.rows.map((r) => ({ ...r, hot: true }))];
   }
 
-  /** One last full pull when an event ends, then it's never fetched again. */
+  /** A full, fresh pull of an event that has just ended (then daily until it settles). */
   private async finishEvent(ev: { id: number; slug: string }): Promise<void> {
     const events = await this.isu.events((await this.seasons()).current);
     const isuEvent = events.find((e) => e.slug === ev.slug);

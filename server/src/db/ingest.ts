@@ -2,7 +2,7 @@ import type { Db } from './pool.js';
 import { isRelay } from '../isu/client.js';
 import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSkater } from '../isu/types.js';
 import { iso2, shortCountry } from '../domain/codes.js';
-import { competitionName, genderName, heatState, normalizeEntries, roundName, titleName, type Entry } from '../domain/normalize.js';
+import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName, type Entry } from '../domain/normalize.js';
 import { parseRule } from '../domain/rules.js';
 import { isuLocalDate, localWallClockToUtc, utc, venueTimeZone } from '../domain/time.js';
 
@@ -11,6 +11,8 @@ const EVENT_STATE: Record<string, EventState> = {
   On: 'upcoming', Scheduled: 'upcoming', Upcoming: 'upcoming',
   Live: 'live', 'In Progress': 'live', Finished: 'finished',
 };
+/** Days after an event ends until ISU stops correcting its results. */
+export const SETTLE_DAYS = 7;
 export const eventState = (s: string | null | undefined): EventState => EVENT_STATE[s ?? ''] ?? 'upcoming';
 
 // Events ISU names by their slug, by ISU event id.
@@ -62,7 +64,9 @@ export class Ingest {
         roundIds.set(rnd.event_result_round_id, rid);
         roundKeys.set(norm(comp.name) + '|' + norm(rnd.name), rid);
         named.push({ title: competitionName(comp.name, comp.gender, isRelay(comp)), label: roundName(rnd.name), roundId: rid });
-        await this.loadHeats(rid, loaded.timeZone, rnd.heats, isRelay(comp));
+        await this.loadHeats(rid, loaded.timeZone, rnd.heats, isRelay(comp), {
+          round: roundName(rnd.name), eventFinished: eventState(tree.event.state) === 'finished',
+        });
       }
     }
     const derived = await this.withStarts(named);
@@ -151,14 +155,17 @@ export class Ingest {
 
   /** Live polling: refresh one round's heats. */
   async loadRoundHeats(roundIsuId: number, heats: IsuHeat[], relay: boolean): Promise<void> {
-    const res = await this.db.query<{ id: number; time_zone: string }>(
-      `select r.id, e.time_zone from round r join competition c on c.id = r.competition_id
+    const res = await this.db.query<{ id: number; name: string; time_zone: string; finished: boolean }>(
+      `select r.id, r.name, e.time_zone, e.state = 'finished' as finished from round r join competition c on c.id = r.competition_id
        join event e on e.id = c.event_id where r.isu_id = $1`, [roundIsuId]);
     const row = res.rows[0];
-    if (row) await this.loadHeats(row.id, row.time_zone, heats, relay);
+    if (row) await this.loadHeats(row.id, row.time_zone, heats, relay, { round: row.name, eventFinished: row.finished });
   }
 
-  async loadHeats(roundId: number, tz: string, heats: IsuHeat[], relay: boolean): Promise<void> {
+  async loadHeats(
+    roundId: number, tz: string, heats: IsuHeat[], relay: boolean,
+    opts: { round: string; eventFinished: boolean },
+  ): Promise<void> {
     if (heats.length === 0) return;
     // heat.date is the planned time until the heat starts, then the actual
     // start. Raced heats go first by actual time, then the rest by plan.
@@ -168,9 +175,10 @@ export class Ingest {
       ['isu_id', 'int'], ['round_id', 'int'], ['name', 'text'], ['display_order', 'smallint'],
       ['run_order', 'smallint'], ['starts_at', 'timestamptz'], ['state', 'heat_state'], ['source_updated_at', 'timestamptz'],
     ], heats.map((h) => ({
-      isu_id: h.event_result_round_heats_id, round_id: roundId, name: h.name, display_order: h.display_order,
+      isu_id: h.event_result_round_heats_id, round_id: roundId,
+      name: heatName(h.name, opts.round, h.display_order, heats.length), display_order: h.display_order,
       run_order: order.indexOf(h) + 1, starts_at: localWallClockToUtc(h.date, tz)?.toISOString() ?? null,
-      state: heatState(h), source_updated_at: utc(h.updated_at)?.toISOString() ?? null,
+      state: heatState(h, opts.eventFinished), source_updated_at: utc(h.updated_at)?.toISOString() ?? null,
     })));
 
     const perHeat = heats.map((h) => ({ heatId: heatIds.get(h.event_result_round_heats_id)!, entries: normalizeEntries(h.event_result_round_heats_competitors) }));
@@ -278,17 +286,34 @@ export class Ingest {
     }
   }
 
-  /** A finished event whose heats are all official is never fetched again. */
-  async markSynced(eventId: number): Promise<boolean> {
+  /**
+   * A finished event settles a week after it ends: until then ISU keeps
+   * entering penalties and renumbering entries (World Tour #1 2026), so it's
+   * fetched again. A settled event is never fetched again, and if any skater
+   * still has no place, time, status or advancement, ISU's results for it are
+   * incomplete: they're dropped and the event is hidden. So is an event ISU
+   * has no results for at all (cancelled).
+   */
+  async markSynced(eventId: number): Promise<{ complete: boolean; missing: number }> {
     const res = await this.db.query<{ complete: boolean }>(
-      // Complete once every heat is official, or a week after the event, since
-      // ISU sometimes never marks a few heats official (Europeans 2026: 10).
-      `update event set synced_at = now(), results_complete = (
-         state = 'finished' and (ends_on < current_date - 7 or not exists (
-           select 1 from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
-           where c.event_id = event.id and h.state <> 'official')))
-       where id = $1 returning results_complete as complete`, [eventId]);
-    return res.rows[0]?.complete ?? false;
+      `update event set synced_at = now(), results_complete = (state = 'finished' and ends_on < current_date - $2::int)
+       where id = $1 returning results_complete as complete`, [eventId, SETTLE_DAYS]);
+    const complete = res.rows[0]?.complete ?? false;
+    if (!complete) return { complete, missing: 0 };
+    const missing = Number((await this.db.query<{ n: string }>(
+      `select count(*) as n from entry x join heat h on h.id = x.heat_id join round r on r.id = h.round_id
+       join competition c on c.id = r.competition_id
+       where c.event_id = $1 and x.rank is null and x.time_ms is null and x.status is null and x.qualification is null`,
+      [eventId])).rows[0]!.n);
+    const empty = !(await this.db.query('select 1 from competition where event_id = $1 limit 1', [eventId])).rowCount;
+    if (missing) {
+      await this.db.query('delete from schedule_item where event_id = $1', [eventId]);
+      await this.db.query('delete from competition where event_id = $1', [eventId]);
+      await this.db.query(`delete from skater k where not exists (select 1 from entry x where x.skater_id = k.id)
+        and not exists (select 1 from relay_member m where m.skater_id = k.id)`);
+    }
+    await this.db.query('update event set incomplete = $2 where id = $1', [eventId, missing > 0 || empty]);
+    return { complete, missing };
   }
 }
 

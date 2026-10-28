@@ -36,10 +36,13 @@ export function iso2(ioc: string | null | undefined): string | null {
 const RESULT_STATUS: Record<string, string> = {
   Penalty: 'PEN', 'Yellow Card': 'YC', 'Red Card': 'RC', 'Did Not Finish': 'DNF', 'Did Not Start': 'DNS',
 };
-const RESULT_TEXT = new Set(['PEN', 'YC', 'RC', 'DNF', 'DNS']);
+const RESULT_TEXT = new Set(['PEN', 'YC', 'RC', 'DNF', 'DNS', 'WDR']);
+// Older events write some outcomes in the time field instead.
+const TEXT_ALIASES: Record<string, string> = { DQ: 'PEN' };
 
 export function statusCode(resultStatus: string | null | undefined, finalResult: string | null | undefined): string | null {
-  return RESULT_STATUS[resultStatus ?? ''] ?? (RESULT_TEXT.has(finalResult ?? '') ? finalResult! : null);
+  const text = TEXT_ALIASES[finalResult ?? ''] ?? finalResult ?? '';
+  return RESULT_STATUS[resultStatus ?? ''] ?? (RESULT_TEXT.has(text) ? text : null);
 }
 
 /** Qualifies outright for the next round (or Final A from a semifinal). */

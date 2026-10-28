@@ -194,9 +194,12 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
     laps: (lapsByEntry.get(e.id) ?? []).map((l) => ({ lap: l.lap_no, pos: l.position, lapMs: l.lap_ms })),
   }));
 
+  // No chart or lap table when ISU is missing a placed skater's laps: one
+  // line short, they'd quietly misstate the race.
+  const lapsWhole = total > 0 && list.every((e) => e.rank == null || lapsByEntry.has(e.id));
   let chart: HeatResponse['chart'] = null;
   let lapTable: HeatResponse['lapTable'] = null;
-  if (total > 0) {
+  if (lapsWhole) {
     const climber = summarize(summaryInput).find((f) => / was \d+\w+ with \d+ laps to go/.test(f))?.split(' was ')[0] ?? null;
     chart = {
       laps: total,
@@ -225,7 +228,7 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
   // ISU removes the laps of a skater who is penalized or carded, which leaves
   // a gap in every lap's positions.
   const sanctioned: Record<string, string> = { PEN: 'was penalized', YC: 'got a yellow card', RC: 'got a red card' };
-  const notes = list.filter((e) => e.status && sanctioned[e.status] && (lapsByEntry.get(e.id)?.length ?? 0) === 0 && total > 0)
+  const notes = list.filter((e) => e.status && sanctioned[e.status] && (lapsByEntry.get(e.id)?.length ?? 0) === 0 && lapsWhole)
     .map((e) => `${e.last}${e.nation ? ` (${e.nation})` : ''} ${sanctioned[e.status!]}. ISU removes their laps, so one place on each lap has no line.`);
 
   return {

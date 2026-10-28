@@ -13,12 +13,32 @@ const HEAT_STATE: Record<string, HeatState> = {
   'Finished|Official': 'official',
 };
 
-export function heatState(h: Pick<IsuHeat, 'status' | 'result_status'>): HeatState {
-  const known = HEAT_STATE[`${h.status}|${h.result_status ?? ''}`];
-  if (known) return known;
-  if (h.status === 'Finished') return 'unofficial';
-  if (h.status === 'Live') return 'running';
-  return 'scheduled';
+export function heatState(
+  h: Pick<IsuHeat, 'status' | 'result_status'> & Partial<Pick<IsuHeat, 'event_result_round_heats_competitors'>>,
+  eventFinished = false,
+): HeatState {
+  let state = HEAT_STATE[`${h.status}|${h.result_status ?? ''}`]
+    ?? (h.status === 'Finished' ? 'unofficial' : h.status === 'Live' ? 'running' : 'scheduled');
+  // ISU never moved most heats before 2023/24 past "Scheduled", results and all.
+  if ((state === 'scheduled' || state === 'start_list') && hasResults(h.event_result_round_heats_competitors)) state = 'unofficial';
+  // Nor marked them official; once the event is over, the results are final.
+  if (eventFinished && state === 'unofficial') state = 'official';
+  return state;
+}
+
+function hasResults(competitors: IsuCompetitor[] | null | undefined): boolean {
+  return (competitors ?? []).some((c) => c.final_rank != null || millis((c.final_result ?? '').trim()) != null
+    || statusCode(c.result_status, (c.final_result ?? '').trim()) != null);
+}
+
+/**
+ * ISU leaves some heats unnamed. A round's only race takes the round's name
+ * ("Final A"; "Finals" → "Final"), other races "Heat 2" by their order.
+ */
+export function heatName(name: string | null | undefined, round: string, displayOrder: number, heatsInRound: number): string {
+  if (name?.trim()) return name.trim();
+  if (heatsInRound === 1 && /^final/i.test(round)) return round.replace(/^Finals$/i, 'Final');
+  return `Heat ${displayOrder}`;
 }
 
 export interface Lap {
