@@ -30,9 +30,10 @@ struct SearchTab: View {
     private var layout: some View {
         @Bindable var model = model
         if split {
-            NavigationSplitView {
+            NavigationSplitView(columnVisibility: .constant(.all)) {
                 SearchResults(query: query, submits: submits)
                     .navigationTitle("Search")
+                    .toolbar(removing: .sidebarToggle) // the sidebar stays open
                     .searchable(text: $query, isPresented: $searching, placement: .sidebar, prompt: "Search or ask")
                     .onSubmit(of: .search) { submits += 1 }
                     .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)

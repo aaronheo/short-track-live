@@ -100,17 +100,17 @@ private struct StackLayout: View {
 
 private struct SplitLayout: View {
     @Environment(AppModel.self) private var model
-    @State private var columns = NavigationSplitViewVisibility.all
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView(columnVisibility: $columns) {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             NavigationStack(path: $model.sidebarPath) {
                 EventsView()
                     .navigationDestination(for: Route.self) { route in
                         if case .event(let slug) = route { ScheduleView(slug: slug).id(slug) }
                     }
             }
+            .toolbar(removing: .sidebarToggle) // the sidebar stays open
             .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
         } detail: {
             NavigationStack(path: $model.detailPath) {

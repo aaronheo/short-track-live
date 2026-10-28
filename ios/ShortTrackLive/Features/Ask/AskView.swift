@@ -38,7 +38,9 @@ struct AskView: View {
             .onChange(of: ask.turns.count) { withAnimation { proxy.scrollTo("end", anchor: .bottom) } }
         }
         .safeAreaInset(edge: .bottom) { composer }
-        .toolbarVisibility(.hidden, for: .tabBar) // the composer takes its place
+        // On a phone the composer takes the tab bar's place; beside a sidebar
+        // there's no back button, so the tab bar is the way out.
+        .toolbarVisibility(app.isSplit ? .automatic : .hidden, for: .tabBar)
         .environment(\.openURL, OpenURLAction { url in
             app.openFromAsk(url) ? .handled : .systemAction
         })
