@@ -230,29 +230,26 @@ private struct HeatSummaryRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Both names when two qualify; past that, one name and a count. A final
+    /// Everyone who qualified, wrapping onto more lines as needed. A final
     /// has no qualifiers, so it shows the winner.
     @ViewBuilder private var outcome: some View {
         let names: [(String, String?)] = heat.qualified.isEmpty
             ? heat.entries.filter { $0.rank == 1 }.map { ($0.last, $0.iso2) }
             : heat.qualified.map { ($0.last, $0.iso2) }
-        let shown = names.count > 2 ? Array(names.prefix(1)) : names
         if !names.isEmpty {
-            HStack(spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(heat.qualified.isEmpty ? "Winner:" : "Qualified:").fixedSize()
-                HStack(spacing: 10) {
-                    ForEach(shown, id: \.0) { last, iso2 in
+                FlowLayout(spacing: 10, lineSpacing: 4) {
+                    // By position: two qualifiers can share a surname.
+                    ForEach(Array(names.enumerated()), id: \.offset) { _, name in
                         HStack(spacing: 5) {
-                            FlagView(iso2: iso2, size: 13)
-                            Text(last)
+                            FlagView(iso2: name.1, size: 13)
+                            Text(name.0)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Theme.ink)
                                 .lineLimit(1)
                         }
                     }
-                }
-                if names.count > shown.count {
-                    Text("+\(names.count - shown.count) more").fixedSize()
                 }
             }
             .font(.footnote)
