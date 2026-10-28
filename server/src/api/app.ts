@@ -4,6 +4,7 @@ import type { ChatEvents, ChatMessage } from '../chat/chat.js';
 import { RateLimit } from '../chat/chat.js';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
+import { Accounts, cleanSettings, parseFavorites, type VerifyGoogle } from './accounts.js';
 import { Athletes, type RaceFilters } from './athletes.js';
 import { Favorites } from './favorites.js';
 import { Repo } from './repo.js';
@@ -22,6 +23,8 @@ export interface AppOptions {
   chat?: { answer(messages: ChatMessage[], events: ChatEvents, signal?: AbortSignal): Promise<void> } | null;
   /** Ask requests per hour for the whole server. */
   chatPerHour?: number;
+  /** Sign in with Google; unset when there's no GOOGLE_CLIENT_ID. */
+  google?: VerifyGoogle | null;
 }
 
 /**
@@ -153,6 +156,51 @@ export function createApp(db: Db, opts: AppOptions = {}) {
 
   app.get('/favorites/suggested', wrap(async (_req, res) => {
     res.json(await favorites.suggested());
+  }));
+
+  // Accounts. POST /auth/google { idToken } signs in and returns a session
+  // token; the /me routes take it in X-Session. PUT /me { favorites: [{ id,
+  // addedAt }], settings } replaces what's saved with the phone's.
+  const accounts = new Accounts(db);
+  const sessionOf = (req: Request) => text(req.get('x-session'));
+  const signedIn = (fn: (req: Request, res: Response, accountId: number) => Promise<unknown>) => wrap(async (req, res) => {
+    const token = sessionOf(req);
+    const accountId = token ? await accounts.fromToken(token) : null;
+    // signedOut tells the app this is its session, not the API token.
+    if (!accountId) return res.status(401).json({ error: 'Sign in again.', signedOut: true });
+    return fn(req, res, accountId);
+  });
+
+  app.post('/auth/google', express.json({ limit: '16kb' }), wrap(async (req, res) => {
+    if (!opts.google) return res.status(503).json({ error: 'Google sign-in isn’t set up on this server.' });
+    const idToken = text(req.body?.idToken);
+    if (!idToken) return res.status(400).json({ error: 'Send the Google ID token as idToken.' });
+    const who = await opts.google(idToken).catch(() => null);
+    if (!who) return res.status(401).json({ error: 'Google didn’t confirm that sign-in.' });
+    const { token, accountId } = await accounts.signInGoogle(who);
+    res.json({ session: token, ...(await accounts.state(accountId)) });
+  }));
+
+  app.post('/auth/signout', wrap(async (req, res) => {
+    const token = sessionOf(req);
+    if (token) await accounts.signOut(token);
+    res.status(204).end();
+  }));
+
+  app.get('/me', signedIn(async (_req, res, accountId) => {
+    res.json(await accounts.state(accountId));
+  }));
+
+  app.put('/me', express.json({ limit: '64kb' }), signedIn(async (req, res, accountId) => {
+    const saved = parseFavorites(req.body?.favorites);
+    if (!saved) return res.status(400).json({ error: 'Send favorites as [{ id, addedAt }].' });
+    await accounts.save(accountId, saved, cleanSettings(req.body?.settings));
+    res.json(await accounts.state(accountId));
+  }));
+
+  app.delete('/me', signedIn(async (_req, res, accountId) => {
+    await accounts.remove(accountId);
+    res.status(204).end();
   }));
 
   // Ask. Body: { messages: [{ role: 'user' | 'assistant', content }] }, the

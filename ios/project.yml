@@ -32,11 +32,13 @@ targets:
       path: ShortTrackLive/Info.plist
       properties:
         CFBundleDisplayName: Short Track
+        CFBundleName: Short Track
         CFBundleURLTypes:
           - CFBundleURLName: com.aaronheo.shorttracklive
             CFBundleURLSchemes: [shorttrack]
         APIBaseURL: $(API_BASE_URL)
         APIToken: $(API_TOKEN)
+        GoogleClientID: $(GOOGLE_CLIENT_ID)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:

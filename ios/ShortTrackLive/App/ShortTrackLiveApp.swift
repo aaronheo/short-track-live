@@ -29,6 +29,7 @@ struct ShortTrackLiveApp: App {
 struct RootView: View {
     @State private var model = AppModel()
     @State private var favorites = Favorites.shared
+    @State private var account = AccountStore.shared
     @State private var inbox = AlertInbox.shared
     @Environment(\.scenePhase) private var phase
     @State private var split = false
@@ -56,6 +57,7 @@ struct RootView: View {
         .onGeometryChange(for: Bool.self) { $0.safeAreaInsets.trailing > $0.safeAreaInsets.leading + 20 } action: { tabBarAtSide = $0 }
         .environment(model)
         .environment(favorites)
+        .environment(account)
         .tint(Theme.link)
         .preferredColorScheme(appearance.colorScheme)
         .onOpenURL { model.open($0) }
@@ -69,12 +71,14 @@ struct RootView: View {
         // one is racing, else every 5 minutes.
         .task(id: phase == .active) {
             guard phase == .active else { return }
+            await account.sync()
             while !Task.isCancelled {
                 let busy = await RaceAlerts.shared.check(favorites)
                 try? await Task.sleep(for: busy ? .seconds(30) : .seconds(300))
             }
         }
         .onChange(of: favorites.skaters) { Task { await RaceAlerts.shared.check(favorites) } }
+        .onChange(of: appearance) { account.localChanged() }
     }
 }
 

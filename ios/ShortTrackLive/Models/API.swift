@@ -297,6 +297,18 @@ struct HeatResponse: Decodable, Sendable {
 
 // MARK: - Decoding
 
+extension JSONEncoder {
+    /// Dates as ISO 8601 with milliseconds, like the server sends them.
+    static let api: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+        }
+        return encoder
+    }()
+}
+
 extension JSONDecoder {
     /// The server sends ISO 8601 with milliseconds ("2026-10-23T16:12:00.000Z").
     static let api: JSONDecoder = {

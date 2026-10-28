@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { Chat } from './chat/chat.js';
 import { createPool } from './db/pool.js';
 import { createApp } from './api/app.js';
+import { googleVerifier } from './api/accounts.js';
 import { startSync } from './sync/run.js';
 
 // API and sync worker in one process: `npm run dev` locally, `npm start` on Render.
@@ -20,8 +21,11 @@ const openAiNames = Object.keys(process.env).filter((k) => /open.?ai/i.test(k)).
 console.log(process.env.OPENAI_API_KEY
   ? `Ask: on (${process.env.OPENAI_MODEL ?? 'gpt-5.5'})`
   : `Ask: off, OPENAI_API_KEY is not set (OpenAI variables seen: ${openAiNames.join(', ') || 'none'})`);
+// Sign in with Google: the iOS app's OAuth client id(s), comma-separated. Unset: /auth/google answers 503.
+const googleIds = (process.env.GOOGLE_CLIENT_ID ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+const google = googleIds.length ? googleVerifier(googleIds) : null;
 const replayHeat = process.env.REPLAY_HEAT ? Number(process.env.REPLAY_HEAT) : null;
-createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool) }).listen(port, () => console.log(`API on http://localhost:${port}`));
+createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google }).listen(port, () => console.log(`API on http://localhost:${port}`));
 startSync().catch((err) => {
   console.error(err);
   process.exit(1);

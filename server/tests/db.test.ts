@@ -262,6 +262,73 @@ describe.skipIf(!url)('database + API', () => {
     for (const s of body.skaters) expect(s.note).toMatch(/^(Gold|Silver|Bronze) \d/);
   });
 
+  describe('accounts', () => {
+    // Stands in for Google: "ok:<sub>:<name>" is a valid ID token.
+    const signIn = () => createApp(pool, {
+      now: () => NOW,
+      google: async (idToken) => {
+        const [ok, sub, name] = idToken.split(':');
+        if (ok !== 'ok' || !sub) throw new Error('Bad token');
+        return { sub, email: `${sub}@example.com`, name: name ?? null };
+      },
+    });
+    const skaterId = async (last: string) => (await one<{ id: number }>('select id from skater where last_name = $1 limit 1', [last])).id;
+
+    it('signs in with Google, saves favorites and settings, signs out and deletes', async () => {
+      const api = signIn();
+      expect((await request(app).post('/auth/google').send({ idToken: 'ok:a' }).expect(503)).body.error).toMatch(/isn’t set up/);
+      await request(api).post('/auth/google').send({ idToken: 'forged' }).expect(401);
+      await request(api).get('/me').expect(401);
+
+      const first = (await request(api).post('/auth/google').send({ idToken: 'ok:g-123:Aaron Heo' }).expect(200)).body;
+      expect(first).toMatchObject({ account: { name: 'Aaron Heo', email: 'g-123@example.com', provider: 'google' }, favorites: [], settings: {} });
+      const session = first.session as string;
+      expect(session).toMatch(/^[\w-]{43}$/);
+
+      const velzeboer = await skaterId('Velzeboer');
+      const sarault = await skaterId('Sarault');
+      const put = await request(api).put('/me').set('X-Session', session).send({
+        favorites: [
+          { id: velzeboer, addedAt: '2026-10-20T10:00:00Z' },
+          { id: sarault, addedAt: '2026-10-21T10:00:00Z' },
+          { id: 999_999_999, addedAt: '2026-10-21T10:00:00Z' }, // not a skater: left out
+        ],
+        settings: { notifyStarts: false, notifyResults: true, appearance: 'dark', extra: 'dropped' },
+      }).expect(200);
+      expect(put.body.favorites.map((f: { last: string }) => f.last)).toEqual(['Velzeboer', 'Sarault']);
+      expect(put.body.favorites[0]).toMatchObject({ id: velzeboer, name: 'Xandra Velzeboer', nat: 'NED', iso2: 'NL', gender: 'Women', addedAt: '2026-10-20T10:00:00.000Z' });
+      expect(put.body.settings).toEqual({ notifyStarts: false, notifyResults: true, appearance: 'dark' });
+      await request(api).put('/me').set('X-Session', session).send({ favorites: [{ id: 'x' }] }).expect(400);
+
+      // Signing in on another phone finds the same account; removing a favorite there sticks.
+      const second = (await request(api).post('/auth/google').send({ idToken: 'ok:g-123' }).expect(200)).body;
+      expect(second.session).not.toBe(session);
+      expect(second.account.name).toBe('Aaron Heo');
+      expect(second.favorites).toHaveLength(2);
+      await request(api).put('/me').set('X-Session', second.session).send({ favorites: [{ id: sarault, addedAt: '2026-10-21T10:00:00Z' }], settings: put.body.settings }).expect(200);
+      expect((await request(api).get('/me').set('X-Session', session).expect(200)).body.favorites.map((f: { id: number }) => f.id)).toEqual([sarault]);
+
+      await request(api).post('/auth/signout').set('X-Session', session).expect(204);
+      await request(api).get('/me').set('X-Session', session).expect(401);
+      await request(api).delete('/me').set('X-Session', second.session).expect(204);
+      await request(api).get('/me').set('X-Session', second.session).expect(401);
+      expect(await one('select count(*)::int as n from account_favorite')).toEqual({ n: 0 });
+      // A new sign-in after deleting starts empty.
+      expect((await request(api).post('/auth/google').send({ idToken: 'ok:g-123' }).expect(200)).body.favorites).toEqual([]);
+    });
+
+    it('keeps accounts away from the Ask role', async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('begin; set local role chat_reader');
+        await expect(client.query('select * from account')).rejects.toThrow(/permission denied/);
+      } finally {
+        await client.query('rollback');
+        client.release();
+      }
+    });
+  });
+
   it('answers 304 when nothing changed', async () => {
     const first = await request(app).get(`/events/${WT1_2026}/schedule`).expect(200);
     await request(app).get(`/events/${WT1_2026}/schedule`).set('If-None-Match', first.headers.etag!).expect(304);

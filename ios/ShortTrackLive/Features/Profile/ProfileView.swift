@@ -14,9 +14,11 @@ enum Appearance: String, CaseIterable {
     }
 }
 
-/// The Profile tab: favorite skaters, their notifications, then appearance and about.
+/// The Profile tab: the account (or signing in), favorite skaters, their
+/// notifications, then appearance and about.
 struct ProfileView: View {
     @Environment(Favorites.self) private var favorites
+    @Environment(AccountStore.self) private var account
     @AppStorage("appearance") private var appearance = Appearance.system
     @Environment(\.colorScheme) private var scheme
     @Environment(\.scenePhase) private var phase
@@ -31,6 +33,11 @@ struct ProfileView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    if account.signedIn {
+                        AccountRow()
+                    } else if GoogleSignIn.isSetUp {
+                        SignInCard()
+                    }
                     favoritesSection
                     notificationsSection
                     appearanceSection
@@ -61,6 +68,30 @@ struct ProfileView: View {
             .onAppear { shown = favorites.skaters }
         }
         .sheet(isPresented: $adding) { AddFavoritesView() }
+        .overlay(alignment: .bottom) {
+            if let notice = account.notice {
+                Label(notice, systemImage: "checkmark")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(Color(hex: 0x0D1B2A), in: .capsule)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                    .onTapGesture { account.notice = nil }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: notice) {
+                        try? await Task.sleep(for: .seconds(4))
+                        account.notice = nil
+                    }
+            }
+        }
+        .animation(.snappy, value: account.notice)
+        .alert("Couldn’t sign in", isPresented: Binding(get: { account.error != nil }, set: { if !$0 { account.error = nil } })) {
+            Button("OK") {}
+        } message: {
+            Text(account.error ?? "")
+        }
         .onChange(of: favorites.skaters) { _, now in
             shown += now.filter { new in !shown.contains { $0.id == new.id } }
         }
@@ -137,7 +168,8 @@ struct ProfileView: View {
                     Button("Turn on notifications") { Task { await allow() } }
                         .fontWeight(.semibold)
                 default:
-                    Text("For every favorite at every ISU event. Tap one to open the race.")
+                    Text(account.signedIn ? "Saved to your account. Tap a notification to open the race."
+                         : "For every favorite at every ISU event. Tap one to open the race.")
                 }
             }
             .font(.footnote)

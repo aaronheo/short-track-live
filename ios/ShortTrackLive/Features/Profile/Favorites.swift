@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A skater you follow. Kept on the phone; the server only sees the ids the
-/// app sends when it checks for their races.
+/// A skater you follow. Kept on the phone, and in the account when signed in
+/// (AccountStore); race checks send only the ids.
 struct FavoriteSkater: Codable, Hashable, Identifiable, Sendable {
     let id: Int
     let name: String
@@ -19,12 +19,14 @@ final class Favorites {
     static let shared = Favorites()
 
     private(set) var skaters: [FavoriteSkater]
-    var notifyStarts: Bool { didSet { defaults.set(notifyStarts, forKey: Keys.starts) } }
-    var notifyResults: Bool { didSet { defaults.set(notifyResults, forKey: Keys.results) } }
+    var notifyStarts: Bool { didSet { defaults.set(notifyStarts, forKey: Keys.starts); onChange?() } }
+    var notifyResults: Bool { didSet { defaults.set(notifyResults, forKey: Keys.results); onChange?() } }
     /// The first star asks about notifications, once.
     var askedAboutNotifications: Bool { didSet { defaults.set(askedAboutNotifications, forKey: Keys.asked) } }
 
     @ObservationIgnored private let defaults: UserDefaults
+    /// Called after favorites or the notification switches change (AccountStore saves them).
+    @ObservationIgnored var onChange: (() -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -47,8 +49,15 @@ final class Favorites {
         save()
     }
 
+    /// The account's list, after signing in or when it changed on another device.
+    func replace(with list: [FavoriteSkater]) {
+        skaters = list
+        save()
+    }
+
     private func save() {
         defaults.set(try? JSONEncoder().encode(skaters), forKey: Keys.skaters)
+        onChange?()
     }
 
     private enum Keys {

@@ -11,7 +11,8 @@ enum AppConfig {
 
     static var token: String? { setting("APIToken") }
 
-    private static func setting(_ key: String) -> String? {
+    /// A launch argument (`-Key value`), else the Info.plist value from ios/Config.
+    static func setting(_ key: String) -> String? {
         let value = UserDefaults.standard.string(forKey: key) ?? Bundle.main.object(forInfoDictionaryKey: key) as? String
         return value?.trimmingCharacters(in: .whitespaces).nonEmpty
     }
@@ -19,9 +20,12 @@ enum AppConfig {
 
 enum APIError: LocalizedError {
     case status(Int)
+    /// The account session is gone (signed out or deleted on another device).
+    case signedOut
 
     var errorDescription: String? {
         switch self {
+        case .signedOut: "You were signed out. Sign in again."
         case .status(401): "The server rejected the app's token (API_TOKEN in ios/Config/Secrets.xcconfig)"
         case .status(404): "Not found"
         case .status(let code): "Server error (\(code))"
@@ -71,6 +75,33 @@ actor APIClient {
             throw APIError.status(code)
         }
     }
+
+    /// POST, PUT or DELETE with an optional JSON body. `account`: the signed-in
+    /// session token, sent as X-Session. Nil for an empty (204) response.
+    func send<T: Decodable & Sendable>(_ method: String, _ path: String, body: (any Encodable & Sendable)? = nil,
+                                       account: String? = nil, as type: T.Type = T.self) async throws -> T? {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = method
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let account { request.setValue(account, forHTTPHeaderField: "X-Session") }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder.api.encode(body)
+        }
+        let (data, response) = try await session.data(for: request)
+        switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
+        case 204:
+            return nil
+        case 200:
+            return try JSONDecoder.api.decode(T.self, from: data)
+        case 401 where (try? JSONDecoder().decode(SignedOutReply.self, from: data))?.signedOut == true:
+            throw APIError.signedOut
+        case let code:
+            throw APIError.status(code)
+        }
+    }
+
+    private struct SignedOutReply: Decodable { let signedOut: Bool? }
 
     /// Forget the ETag so the next call returns a value (a screen that was
     /// recreated has nothing to fall back on).

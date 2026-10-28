@@ -52,6 +52,7 @@ Live at https://short-track-live.onrender.com (workspace `short-track-live`). `r
 2. Fill in `DATABASE_URL` with Supabase's **Session pooler** string (Connect → Session pooler). Render has no IPv6, so the direct `db.<ref>.supabase.co` string won't connect.
 3. Render generates `API_TOKEN`. Copy `ios/Config/Secrets.xcconfig.example` to `ios/Config/Secrets.xcconfig` and put the service URL and that token in it.
 4. For Ask, add `OPENAI_API_KEY` under the service's **Environment**.
+5. For signing in, add `GOOGLE_CLIENT_ID` (see Accounts below).
 
 Every push to `main` redeploys. The raw ISU cache lives on the service's disk and is lost on redeploy; that only costs a refetch of events that aren't complete yet.
 
@@ -71,6 +72,19 @@ Tabs: Events, Profile, and Search, where a name finds athletes and a question go
 Star a skater on their page, or add them in Profile (which also holds light/dark). Favorites stay on the phone. The app asks the server for their races (`GET /favorites/races?skaters=…`, which also writes the notification text) and notifies, if you allow it, when a favorite's race is next on the ice and when its result is official, relays included. ISU names a relay team's skaters only after the race, so before it a relay counts if the favorite skated that relay for that nation in the past year, and the alert names the team ("Netherlands is up next · Velzeboer's team"). Profile has a switch for each kind, so results can stay unspoiled.
 
 There's no push from the server yet: that needs a paid Apple developer account (APNs). Until then the phone does it. It schedules "up next" for 4 minutes before each heat's planned start, and posts it straight away if the server says the heat is next. Results come whenever the app gets to check: every 30 s while it's open and a favorite is racing, and in background refreshes, which iOS runs when it sees fit (often not for a while).
+
+### Accounts (Sign in with Google)
+
+Signing in is optional; without it everything stays on the phone. Signed in, favorites and settings (notification switches, appearance) are saved to an account and come back on another iPhone or iPad. On the first sign-in the phone's favorites and the account's are combined and the phone's settings win; after that the phone sends its whole state after each change (`PUT /me`) and loads the account's when the app opens (`GET /me`), so the last change wins.
+
+The app does Google's sign-in itself (system sign-in sheet, PKCE, no Google SDK) and sends the ID token to `POST /auth/google`. The server checks it against Google's keys and `GOOGLE_CLIENT_ID`, and returns a session token the app keeps in the Keychain and sends as `X-Session`. Accounts live in `account`, `account_session` (only a SHA-256 of each token) and `account_favorite`, which the Ask role can't read. Signing out keeps the phone's copy; deleting the account removes everything saved in it.
+
+Setup, once:
+1. Google Cloud Console → a project → **Google Auth Platform**: set up the consent screen (External; while it's in Testing, add your Google account as a test user).
+2. **Clients → Create client → iOS**, bundle id `com.aaronheo.shorttracklive`. Copy the client id (`….apps.googleusercontent.com`; not a secret).
+3. Put it in `GOOGLE_CLIENT_ID` in `ios/Config/App.xcconfig` and in Render's environment. Without it the app shows no sign-in and `/auth/google` answers 503.
+
+Sign in with Apple needs the paid Apple developer account, so it comes later.
 
 Flags are from [flag-icons](https://github.com/lipis/flag-icons) (MIT, see `ios/ShortTrackLive/Resources/FlagIconsLICENSE.txt`).
 
