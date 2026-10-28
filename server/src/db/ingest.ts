@@ -289,31 +289,61 @@ export class Ingest {
   /**
    * A finished event settles a week after it ends: until then ISU keeps
    * entering penalties and renumbering entries (World Tour #1 2026), so it's
-   * fetched again. A settled event is never fetched again, and if any skater
-   * still has no place, time, status or advancement, ISU's results for it are
-   * incomplete: they're dropped and the event is hidden. So is an event ISU
-   * has no results for at all (cancelled).
+   * fetched again. A settled event is never fetched again. If ISU's results
+   * for it are still incomplete then (see gaps), they're dropped and the event
+   * is hidden; so is an event ISU has no results for at all (cancelled).
    */
-  async markSynced(eventId: number): Promise<{ complete: boolean; missing: number }> {
+  async markSynced(eventId: number): Promise<{ complete: boolean; gaps: string | null }> {
     const res = await this.db.query<{ complete: boolean }>(
       `update event set synced_at = now(), results_complete = (state = 'finished' and ends_on < current_date - $2::int)
        where id = $1 returning results_complete as complete`, [eventId, SETTLE_DAYS]);
     const complete = res.rows[0]?.complete ?? false;
-    if (!complete) return { complete, missing: 0 };
-    const missing = Number((await this.db.query<{ n: string }>(
-      `select count(*) as n from entry x join heat h on h.id = x.heat_id join round r on r.id = h.round_id
-       join competition c on c.id = r.competition_id
-       where c.event_id = $1 and x.rank is null and x.time_ms is null and x.status is null and x.qualification is null`,
-      [eventId])).rows[0]!.n);
+    if (!complete) return { complete, gaps: null };
+    const gaps = await this.gaps(eventId);
     const empty = !(await this.db.query('select 1 from competition where event_id = $1 limit 1', [eventId])).rowCount;
-    if (missing) {
+    if (gaps) {
       await this.db.query('delete from schedule_item where event_id = $1', [eventId]);
       await this.db.query('delete from competition where event_id = $1', [eventId]);
       await this.db.query(`delete from skater k where not exists (select 1 from entry x where x.skater_id = k.id)
         and not exists (select 1 from relay_member m where m.skater_id = k.id)`);
     }
-    await this.db.query('update event set incomplete = $2 where id = $1', [eventId, missing > 0 || empty]);
-    return { complete, missing };
+    await this.db.query('update event set incomplete = $2 where id = $1', [eventId, gaps != null || empty]);
+    return { complete, gaps };
+  }
+
+  /**
+   * What ISU is missing for an event, or null: skaters with no place, time,
+   * status or advancement; races with places beyond their skaters (3rd, 4th
+   * and 5th of three: the others are gone); distances without a final (or one
+   * with a single entry); races with places but no times. A lone skater
+   * placed without a time is a walkover, and one placed untimed among timed
+   * ones fell. A penalized skater keeps a place number at some events, so
+   * 1, 2, 4 and a PEN is a whole race.
+   */
+  async gaps(eventId: number): Promise<string | null> {
+    const res = await this.db.query<{ results: string; short: string; finals: string; untimed: string }>(
+      `with h as (
+         select c.id as comp_id, h.id, h.name,
+           (select count(*) from entry x where x.heat_id = h.id) as entries,
+           (select count(*) from entry x where x.heat_id = h.id and x.rank is not null) as placed,
+           (select count(*) from entry x where x.heat_id = h.id and x.time_ms is not null) as timed,
+           (select max(x.rank) from entry x where x.heat_id = h.id) as top
+         from competition c join round r on r.competition_id = c.id join heat h on h.round_id = r.id where c.event_id = $1)
+       select
+         (select count(*) from entry x join h on h.id = x.heat_id
+          where x.rank is null and x.time_ms is null and x.status is null and x.qualification is null) as results,
+         (select count(*) from h where h.top > h.entries) as short,
+         (select count(*) from competition c where c.event_id = $1 and not exists (
+            select 1 from h where h.comp_id = c.id and h.name in ('Final', 'Final A', 'Super Final') and h.entries >= 2)) as finals,
+         (select count(*) from h where h.placed >= 2 and h.timed = 0) as untimed`, [eventId]);
+    const { results, short, finals, untimed } = res.rows[0]!;
+    const parts = [
+      Number(results) && `${results} skaters without a result`,
+      Number(short) && `${short} races missing skaters`,
+      Number(finals) && `${finals} distances without a final`,
+      Number(untimed) && `${untimed} races without times`,
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : null;
   }
 }
 

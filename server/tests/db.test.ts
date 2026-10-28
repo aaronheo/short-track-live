@@ -210,14 +210,15 @@ describe.skipIf(!url)('database + API', () => {
   it('settles a finished event a week on, and hides it if ISU is missing results', async () => {
     const ingest = new Ingest(pool);
     const live = await one<{ id: number }>('select id from event where slug = $1', [WT1_2026]);
-    expect(await ingest.markSynced(live.id)).toEqual({ complete: false, missing: 0 });
+    expect(await ingest.markSynced(live.id)).toEqual({ complete: false, gaps: null });
 
     const worlds = await one<{ id: number }>('select id from event where slug = $1', [WORLDS]);
+    expect(await ingest.gaps(worlds.id)).toBeNull();
     await pool.query(
       `update entry set rank = null, time_ms = null, status = null, qualification = null where id = (
          select x.id from entry x join heat h on h.id = x.heat_id join round r on r.id = h.round_id
          join competition c on c.id = r.competition_id where c.event_id = $1 limit 1)`, [worlds.id]);
-    expect(await ingest.markSynced(worlds.id)).toEqual({ complete: true, missing: 1 });
+    expect(await ingest.markSynced(worlds.id)).toEqual({ complete: true, gaps: '1 skaters without a result' });
     expect(await one('select incomplete, results_complete from event where id = $1', [worlds.id]))
       .toEqual({ incomplete: true, results_complete: true });
     expect(await one<{ n: number }>('select count(*)::int as n from competition where event_id = $1', [worlds.id])).toEqual({ n: 0 });
