@@ -8,7 +8,7 @@ import { placesCard, type PlacesCard } from '../domain/places.js';
 import type { QualRule } from '../domain/rules.js';
 import { summarize } from '../domain/summary.js';
 import { clock, dayKey, dayLabel, lapsFor } from '../domain/time.js';
-import type { EntryRow, EventRow, HeatRow, LapRow, RoundRow, ScheduleRow } from './repo.js';
+import type { EntryRow, EventRow, HeatRow, LapRow, MemberRow, RoundRow, ScheduleRow } from './repo.js';
 
 type State = 'upcoming' | 'live' | 'finished';
 
@@ -36,7 +36,10 @@ export interface EntryView {
   id: number; athleteId: number | null; rank: number | null; name: string; last: string; nat: string | null; iso2: string | null;
   startPosition: number | null; time: string | null; gap: string | null; status: string | null;
   badge: string | null; lastLap: string | null; laps: number;
+  /** Relays (heat detail only): who skated for the team. */
+  members?: RelayMember[];
 }
+export interface RelayMember { id: number; name: string; short: string }
 export interface HeatBlock {
   id: number; name: string; state: HeatState; runOrder: number | null; startsAt: string | null;
   lap: { current: number; total: number | null } | null;
@@ -181,7 +184,22 @@ export function onTheIce(view: RoundResponse): OnTheIce {
   };
 }
 
-export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: LapRow[]): HeatResponse {
+/**
+ * A relay team's skaters, by surname; "J. Van 't Wout" and "M. Van 't Wout"
+ * when two share one.
+ */
+export function relayMembers(rows: MemberRow[]): RelayMember[] {
+  return rows.map((m) => {
+    const twin = rows.some((o) => o !== m && o.last_name === m.last_name);
+    const initial = m.first_name?.trim().charAt(0);
+    return {
+      id: m.id, name: m.first_name ? `${m.first_name} ${m.last_name}` : m.last_name,
+      short: twin && initial ? `${initial}. ${m.last_name}` : m.last_name,
+    };
+  });
+}
+
+export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: LapRow[], members: MemberRow[] = []): HeatResponse {
   const list = sortEntries(entries, h.state === 'running' ? 'running' : 'official');
   const winnerMs = list.find((e) => e.rank === 1)?.time_ms ?? null;
   const lapsByEntry = new Map<number, LapRow[]>();
@@ -235,7 +253,10 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
 
   return {
     heat: { id: h.id, name: h.name, state: h.state, roundId: r.id, round: r.name, competition: r.competition, event: r.event_name, isRelay: r.is_relay },
-    results: list.map((e) => entryView(e, winnerMs, false, h.state)),
+    results: list.map((e) => {
+      const view = entryView(e, winnerMs, false, h.state);
+      return r.is_relay ? { ...view, members: relayMembers(members.filter((m) => m.entry_id === e.id)) } : view;
+    }),
     summary: h.state === 'official' || h.state === 'unofficial' ? summarize(summaryInput) : [],
     chart, lapTable, notes,
   };

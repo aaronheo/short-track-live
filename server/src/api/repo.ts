@@ -28,6 +28,8 @@ export interface EntryRow {
   lap_count: number; last_lap_no: number | null; last_lap_ms: number | null; last_position: number | null; last_gap_ms: number | null;
 }
 
+export interface MemberRow { entry_id: number; id: number; first_name: string | null; last_name: string }
+
 export interface LapRow { entry_id: number; lap_no: number; lap_ms: number | null; elapsed_ms: number | null; position: number | null; gap_ms: number | null }
 
 export interface ScheduleRow {
@@ -130,6 +132,15 @@ export class Repo {
 
   async entriesForHeat(heatId: number): Promise<EntryRow[]> {
     return (await this.db.query<EntryRow>(`${ENTRY_SELECT} where en.heat_id = $1`, [heatId])).rows;
+  }
+
+  /** Who skated for each relay team in the heat. */
+  async relayMembersForHeat(heatId: number): Promise<MemberRow[]> {
+    const res = await this.db.query<MemberRow>(
+      `select rm.entry_id, s.id, s.first_name, s.last_name
+       from relay_member rm join entry en on en.id = rm.entry_id join skater s on s.id = rm.skater_id
+       where en.heat_id = $1 order by rm.entry_id, s.last_name, s.first_name`, [heatId]);
+    return res.rows;
   }
 
   async lapsForHeat(heatId: number): Promise<LapRow[]> {

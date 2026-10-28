@@ -225,6 +225,36 @@ describe.skipIf(!url)('database + API', () => {
     expect((await request(app).get('/favorites/races').expect(200)).body).toEqual({ races: [] });
   });
 
+  it('GET /heats/:id lists who skated for each relay team', async () => {
+    const heat = await one<{ id: number; team: string; n: number }>(
+      `select h.id, t.name as team, count(rm.*)::int as n
+       from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+       join entry en on en.heat_id = h.id join relay_team t on t.id = en.team_id join relay_member rm on rm.entry_id = en.id
+       where c.is_relay and h.state = 'official' group by h.id, t.name order by h.id limit 1`);
+    const { body } = await request(app).get(`/heats/${heat.id}`).expect(200);
+    const row = body.results.find((r: { name: string }) => r.name === heat.team);
+    expect(row.members).toHaveLength(heat.n);
+    expect(row.members[0]).toEqual({ id: expect.any(Number), name: expect.any(String), short: expect.any(String) });
+  });
+
+  it('GET /favorites/races counts a relay still to come for a skater who skated it for that team', async () => {
+    // WT1 2026 relays are start lists without names; the skater raced that relay for the team at WT1 2025.
+    const pick = await one<{ heat_id: number; skater_id: number; team: string }>(
+      `select h.id as heat_id, rm.skater_id, t.name as team
+       from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
+       join entry en on en.heat_id = h.id join relay_team t on t.id = en.team_id
+       join entry past on past.nation = en.nation and past.team_id is not null join relay_member rm on rm.entry_id = past.id
+       join heat ph on ph.id = past.heat_id join round pr on pr.id = ph.round_id join competition pc on pc.id = pr.competition_id
+       where e.slug = $1 and c.is_relay and h.state = 'start_list' and h.starts_at > $2 and pc.name = c.name
+         and ph.starts_at > h.starts_at - interval '1 year'
+       order by h.starts_at, h.id limit 1`, [WT1_2026, NOW]);
+    const { body } = await request(app).get(`/favorites/races?skaters=${pick.skater_id}`).expect(200);
+    const race = body.races.find((r: { heatId: number }) => r.heatId === pick.heat_id);
+    expect(race.start.title).toBe(`${pick.team} is up next`);
+    expect(race.start.body).toMatch(/’s team · /);
+    expect(race.result).toBeNull();
+  });
+
   it('GET /favorites/suggested lists the latest medalists', async () => {
     const { body } = await request(app).get('/favorites/suggested').expect(200);
     expect(body.event).toBe('World Championships');

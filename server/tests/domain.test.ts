@@ -234,7 +234,7 @@ describe('sync retries', () => {
 
 describe('favorite alerts', () => {
   const race = (heat: string, round: string, destination: string | null = null): AlertRace => ({
-    competition: 'Women 1000 m', distanceM: 1000, round, heat, destination, event: 'World Tour #1, Vancouver',
+    competition: 'Women 1000 m', distanceM: 1000, relay: false, round, heat, destination, event: 'World Tour #1, Vancouver',
   });
   const skater = (name: string, rank: number | null, time: string | null, qualification: string | null = null, status: string | null = null) =>
     ({ name, last: name.split(' ').slice(1).join(' '), rank, time, status, qualification });
@@ -267,6 +267,26 @@ describe('favorite alerts', () => {
       title: 'Velzeboer 1st, Kim 2nd, Sarault 3rd',
       body: 'Velzeboer and Kim qualified for the final, Sarault for Final B · Women 1000 m Semifinal, Heat 2',
     });
+  });
+
+  it('names the team and its favorites in a relay', () => {
+    const relay = (heat: string, round: string, destination: string | null = null): AlertRace => ({
+      competition: 'Women 3000 m Relay', distanceM: 3000, relay: true, round, heat, destination, event: 'World Tour #1, Vancouver',
+    });
+    expect(upNext(relay('Final', 'Finals'), [{ name: 'Xandra Velzeboer', last: 'Velzeboer' }], ['Netherlands'])).toEqual({
+      title: 'Xandra Velzeboer is up next', body: 'Women 3000 m Relay Final · Netherlands · World Tour #1, Vancouver',
+    });
+    // Before the race ISU hasn't named the team's skaters.
+    expect(upNext(relay('Final', 'Finals'), [{ name: 'Xandra Velzeboer', last: 'Velzeboer' }], ['Netherlands'], false)).toEqual({
+      title: 'Netherlands is up next', body: 'Women 3000 m Relay Final · Velzeboer’s team · World Tour #1, Vancouver',
+    });
+    const team = { name: 'Netherlands', last: 'Netherlands', status: null, with: ['Xandra Velzeboer', 'Selma Poutsma'] };
+    expect(result(relay('Final', 'Finals'), [{ ...team, rank: 1, time: '4:05.912', qualification: null }])).toEqual({
+      title: 'Netherlands won the 3000 m Relay Final',
+      body: '4:05.912 · with Xandra Velzeboer and Selma Poutsma · Women 3000 m Relay · World Tour #1, Vancouver',
+    });
+    expect(result(relay('Heat 1', 'Semifinals', 'Final A'), [{ ...team, rank: 2, time: '4:08.100', qualification: 'Q' }]).body)
+      .toBe('4:08.100 · Qualified for Final A · with Xandra Velzeboer and Selma Poutsma · Women 3000 m Relay');
   });
 
   it('writes ordinals, lists and medal notes', () => {

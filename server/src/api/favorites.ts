@@ -31,7 +31,10 @@ export interface SuggestedResponse {
 
 interface Row {
   heat_id: number; round_id: number; heat: string; state: HeatRow['state']; starts_at: Date | null;
-  round: string; destination: string | null; competition: string; distance_m: number | null;
+  round: string; destination: string | null; competition: string; distance_m: number | null; is_relay: boolean;
+  entry_id: number; team: string | null;
+  /** False for a relay still to come: ISU doesn't name the skaters until it's raced. */
+  named: boolean;
   slug: string; event_name: string; city: string | null;
   skater_id: number; first_name: string | null; last_name: string;
   rank: number | null; time_text: string | null; status: string | null; qualification: string | null;
@@ -45,26 +48,44 @@ export class Favorites {
   constructor(private readonly db: Db) {}
 
   /**
-   * Individual races of these skaters from a day and a half ago to four days
-   * ahead. Relays aren't included yet.
+   * Races of these skaters from a day and a half ago to four days ahead:
+   * their own, and their relays. ISU names a relay's skaters only once it's
+   * raced, so a relay still to come counts if they skated that relay for
+   * that nation in the past year (ISU's team ids change every event).
    */
   async races(skaterIds: number[], now: Date): Promise<FavoritesResponse> {
     if (!skaterIds.length) return { races: [] };
     const rows = (await this.db.query<Row>(
-      `select h.id as heat_id, h.round_id, h.name as heat, h.state, h.starts_at,
-         r.name as round, r.destination, c.name as competition, c.distance_m,
+      `with mine as (
+         select en.id as entry_id, en.skater_id, true as named from entry en where en.skater_id = any($1::int[])
+         union
+         select rm.entry_id, rm.skater_id, true from relay_member rm where rm.skater_id = any($1::int[])
+         union
+         select en.id, rm.skater_id, false
+         from entry en
+         join heat h on h.id = en.heat_id join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+         join entry past on past.nation = en.nation and past.team_id is not null
+         join relay_member rm on rm.entry_id = past.id and rm.skater_id = any($1::int[])
+         join heat ph on ph.id = past.heat_id join round pr on pr.id = ph.round_id join competition pc on pc.id = pr.competition_id
+         where c.is_relay and h.state in ('scheduled', 'start_list')
+           and h.starts_at between $2::timestamptz and $2::timestamptz + interval '4 days'
+           and not exists (select 1 from relay_member named where named.entry_id = en.id)
+           and pc.name = c.name and ph.starts_at between h.starts_at - interval '1 year' and h.starts_at)
+       select h.id as heat_id, h.round_id, h.name as heat, h.state, h.starts_at,
+         r.name as round, r.destination, c.name as competition, c.distance_m, c.is_relay,
          e.slug, e.name as event_name, e.city,
-         s.id as skater_id, s.first_name, s.last_name,
+         en.id as entry_id, t.name as team, m.named, s.id as skater_id, s.first_name, s.last_name,
          en.rank, en.time_text, en.status, en.qualification
-       from entry en
-       join skater s on s.id = en.skater_id
+       from mine m
+       join entry en on en.id = m.entry_id
+       join skater s on s.id = m.skater_id
+       left join relay_team t on t.id = en.team_id
        join heat h on h.id = en.heat_id
        join round r on r.id = h.round_id
        join competition c on c.id = r.competition_id
        join event e on e.id = c.event_id
-       where en.skater_id = any($1::int[]) and not c.is_relay
-         and h.starts_at between $2::timestamptz - interval '36 hours' and $2::timestamptz + interval '4 days'
-       order by h.starts_at, h.id, en.rank nulls last, s.last_name`, [skaterIds, now])).rows;
+       where h.starts_at between $2::timestamptz - interval '36 hours' and $2::timestamptz + interval '4 days'
+       order by h.starts_at, h.id, en.rank nulls last, en.id, s.last_name`, [skaterIds, now])).rows;
 
     // The first heat still to race at each live event.
     const next = new Set((await this.db.query<{ id: number }>(
@@ -80,20 +101,29 @@ export class Favorites {
       races: [...byHeat.values()].map((heatRows) => {
         const h = heatRows[0]!;
         const race: AlertRace = {
-          competition: h.competition, distanceM: h.distance_m, round: h.round, heat: h.heat,
+          competition: h.competition, distanceM: h.distance_m, relay: h.is_relay, round: h.round, heat: h.heat,
           destination: h.destination, event: [shortEventName(h.event_name), h.city].filter(Boolean).join(', '),
         };
-        const skaters: AlertSkater[] = heatRows.map((r) => ({
-          name: r.first_name ? `${r.first_name} ${r.last_name}` : r.last_name, last: r.last_name,
-          rank: r.rank, time: r.status ? null : r.time_text, status: r.status, qualification: r.qualification,
-        }));
+        const full = (r: Row) => (r.first_name ? `${r.first_name} ${r.last_name}` : r.last_name);
+        const people = heatRows.map((r) => ({ name: full(r), last: r.last_name }));
+        // One line per entry: the skater, or the team with its favorites.
+        const byEntry = new Map<number, Row[]>();
+        for (const r of heatRows) byEntry.set(r.entry_id, [...(byEntry.get(r.entry_id) ?? []), r]);
+        const skaters: AlertSkater[] = [...byEntry.values()].map((rs) => {
+          const r = rs[0]!;
+          const result = { rank: r.rank, time: r.status ? null : r.time_text, status: r.status, qualification: r.qualification };
+          return h.is_relay && r.team
+            ? { name: r.team, last: r.team, with: rs.map(full), ...result }
+            : { name: full(r), last: r.last_name, ...result };
+        });
+        const teams = h.is_relay ? [...new Set(heatRows.flatMap((r) => (r.team ? [r.team] : [])))] : [];
         const soon = h.starts_at != null && h.starts_at.getTime() - now.getTime() <= UP_NEXT_WINDOW_MIN * 60_000;
         return {
           heatId: h.heat_id, roundId: h.round_id, event: h.slug,
           startsAt: h.starts_at?.toISOString() ?? null, state: h.state,
           upNext: next.has(h.heat_id) && soon,
-          skaters: heatRows.map((r) => r.skater_id),
-          start: upNext(race, skaters),
+          skaters: [...new Set(heatRows.map((r) => r.skater_id))],
+          start: upNext(race, people, teams, heatRows.every((r) => r.named)),
           result: h.state === 'official' ? result(race, skaters) : null,
         };
       }),

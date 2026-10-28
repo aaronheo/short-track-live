@@ -6,6 +6,7 @@ import { distanceLabel, medal, roundLabel } from './format.js';
 export interface AlertRace {
   competition: string; // "Women 1000 m"
   distanceM: number | null;
+  relay: boolean;
   round: string; // "Semifinals"
   heat: string; // "Heat 2", "Final", "Final B"
   /** Where Q goes from this round ("Semifinals", "Final A"); null if ISU doesn't say. */
@@ -13,13 +14,16 @@ export interface AlertRace {
   event: string; // "World Tour #1, Vancouver"
 }
 
+/** A skater, or in a relay the team ("Netherlands") with the favorites who skated for it. */
 export interface AlertSkater {
-  name: string; // "Courtney Sarault"
+  name: string; // "Courtney Sarault", "Netherlands"
   last: string;
   rank: number | null;
   time: string | null; // "2:28.091", or null for no time
   status: string | null; // PEN | YC | RC | DNF | DNS
   qualification: string | null; // Q | q | QA | QB | qA | qB | ADV ...
+  /** Relays: the favorites in the team ("Xandra Velzeboer"). */
+  with?: string[];
 }
 
 export interface AlertText { title: string; body: string }
@@ -29,23 +33,37 @@ export function raceName(r: AlertRace): string {
   return `${r.competition} ${roundLabel(r.round, r.heat).replace(' · ', ', ')}`;
 }
 
-export function upNext(r: AlertRace, skaters: Pick<AlertSkater, 'name' | 'last'>[]): AlertText {
+/**
+ * `teams`: in a relay, the teams the favorites skate for. `named`: false when
+ * ISU hasn't said who skates yet (it names them after the race), so the alert
+ * is about the team: "Netherlands is up next · Velzeboer's team".
+ */
+export function upNext(r: AlertRace, skaters: Pick<AlertSkater, 'name' | 'last'>[], teams: string[] = [], named = true): AlertText {
+  if (!named && teams.length) {
+    const whose = `${list([...new Set(skaters.map((s) => s.last))])}’s team${teams.length > 1 ? 's' : ''}`;
+    return { title: `${list(teams)} ${teams.length === 1 ? 'is' : 'are'} up next`, body: [raceName(r), whose, r.event].join(' · ') };
+  }
   const who = skaters.length === 1 ? skaters[0]!.name : list(skaters.map((s) => s.last));
-  return { title: `${who} ${skaters.length === 1 ? 'is' : 'are'} up next`, body: `${raceName(r)} · ${r.event}` };
+  return {
+    title: `${who} ${skaters.length === 1 ? 'is' : 'are'} up next`,
+    body: [raceName(r), teams.length ? list(teams) : null, r.event].filter(Boolean).join(' · '),
+  };
 }
 
 export function result(r: AlertRace, skaters: AlertSkater[]): AlertText {
   const final = /^final/i.test(r.heat.trim());
-  const distance = distanceLabel(r.competition, r.distanceM, false);
+  const distance = distanceLabel(r.competition, r.distanceM, r.relay);
   if (skaters.length === 1) {
     const s = skaters[0]!;
-    if (s.status && STATUS[s.status]) return { title: `${s.name} ${STATUS[s.status]}`, body: `${raceName(r)} · ${r.event}` };
-    if (s.rank == null) return { title: `Results are in for ${s.name}`, body: `${raceName(r)} · ${r.event}` };
+    const where = [raceName(r), s.with?.length ? `with ${list(s.with)}` : null, r.event].filter(Boolean).join(' · ');
+    if (s.status && STATUS[s.status]) return { title: `${s.name} ${STATUS[s.status]}`, body: where };
+    if (s.rank == null) return { title: `Results are in for ${s.name}`, body: where };
     const title = final && s.rank === 1 && medal(r.heat, s.rank) ? `${s.name} won the ${distance} ${r.heat}`
       : final ? `${s.name} ${ordinal(s.rank)} in the ${distance} ${r.heat}`
       : `${s.name} ${ordinal(s.rank)} in ${roundLabel(r.round, r.heat).replace(' · ', ', ')}`;
     const advance = final ? null : advanceText(s.qualification, r.destination);
-    return { title, body: [s.time, advance, final ? `${r.competition} · ${r.event}` : r.competition].filter(Boolean).join(' · ') };
+    const team = s.with?.length ? `with ${list(s.with)}` : null;
+    return { title, body: [s.time, advance, team, final ? `${r.competition} · ${r.event}` : r.competition].filter(Boolean).join(' · ') };
   }
   const ordered = [...skaters].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
   const title = ordered.map((s) => `${s.last} ${s.status ?? (s.rank != null ? ordinal(s.rank) : 'no place')}`).join(', ');
