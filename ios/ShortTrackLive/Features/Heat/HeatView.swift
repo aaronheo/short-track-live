@@ -180,11 +180,11 @@ private struct PositionChart: View {
     }
 
     private func rank(_ s: HeatResponse.Chart.Series) -> Int {
-        s.last == chart.winner ? 2 : s.last == chart.climber ? 1 : 0
+        s.key == chart.winner ? 2 : s.key == chart.climber ? 1 : 0
     }
 
     private func color(_ s: HeatResponse.Chart.Series) -> Color {
-        s.last == chart.winner ? Theme.chartWinner : s.last == chart.climber ? Theme.chartClimber : Theme.chartOther
+        s.key == chart.winner ? Theme.chartWinner : s.key == chart.climber ? Theme.chartClimber : Theme.chartOther
     }
 
     private var maxPosition: Int {
@@ -199,18 +199,19 @@ private struct PositionChart: View {
     }
 
     /// A skater's line up to `lap`, ending partway to the next crossing.
-    private func points(_ s: HeatResponse.Chart.Series, upTo lap: Double) -> [Point] {
+    /// `line` keeps skaters apart even when they share a surname.
+    private func points(_ s: HeatResponse.Chart.Series, line: String, upTo lap: Double) -> [Point] {
         let known = s.positions.enumerated().compactMap { i, pos in pos.map { (lap: Double(i + 1), pos: Double($0)) } }
         var points: [Point] = []
         for (k, cur) in known.enumerated() {
             if cur.lap <= lap {
-                points.append(Point(skater: s.last, lap: cur.lap, position: cur.pos))
+                points.append(Point(skater: line, lap: cur.lap, position: cur.pos))
                 continue
             }
             if k > 0, known[k - 1].lap < lap {
                 let prev = known[k - 1]
                 let f = (lap - prev.lap) / (cur.lap - prev.lap)
-                points.append(Point(skater: s.last, lap: lap, position: prev.pos + (cur.pos - prev.pos) * f))
+                points.append(Point(skater: line, lap: lap, position: prev.pos + (cur.pos - prev.pos) * f))
             }
             break
         }
@@ -279,8 +280,8 @@ private struct PositionChart: View {
             // Every place from the start, so the axis stays put while the lines grow.
             PointMark(x: .value("Lap", 1.0), y: .value("Position", 1.0)).opacity(0)
             PointMark(x: .value("Lap", 1.0), y: .value("Position", Double(maxPosition))).opacity(0)
-            ForEach(ordered) { series in
-                let points = points(series, upTo: lap)
+            ForEach(Array(ordered.enumerated()), id: \.offset) { index, series in
+                let points = points(series, line: "\(index)", upTo: lap)
                 ForEach(points) { point in
                     LineMark(x: .value("Lap", point.lap), y: .value("Position", point.position), series: .value("Skater", point.skater))
                         .foregroundStyle(color(series))
@@ -294,7 +295,7 @@ private struct PositionChart: View {
                                     overflowResolution: .init(x: .disabled, y: .disabled)) {
                             HStack(spacing: 4) {
                                 FlagView(iso2: series.iso2, size: 11)
-                                Text(series.last)
+                                Text(series.code ?? series.last)
                                     .font(.caption.weight(rank(series) > 0 ? .semibold : .regular))
                                     .foregroundStyle(rank(series) > 0 ? Theme.ink : Theme.muted)
                             }
@@ -337,7 +338,7 @@ private struct PositionChart: View {
         .chartLegend(.hidden)
         .frame(height: CGFloat(max(5, maxPosition)) * 24 + 40)
         .padding(.leading, 8)
-        .padding(.trailing, 104) // room for the flags and names at the end of each line
+        .padding(.trailing, 72) // room for the flags and codes at the end of each line
         .accessibilityLabel(accessibilitySummary)
     }
 

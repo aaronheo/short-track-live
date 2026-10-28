@@ -238,12 +238,15 @@ struct HeatResponse: Decodable, Sendable {
     }
 
     struct Chart: Decodable, Sendable {
-        struct Series: Decodable, Hashable, Sendable, Identifiable {
+        struct Series: Decodable, Hashable, Sendable {
             let last: String
+            /// Three letters, as on TV ("NAD"); unique within the race.
+            let code: String?
             let iso2: String?
             let positions: [Int?]
 
-            var id: String { last }
+            /// What winner and climber name: the code, or the surname from an older server.
+            var key: String { code ?? last }
         }
 
         let laps: Int

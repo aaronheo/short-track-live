@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { shortCountry, statusCode } from '../src/domain/codes.js';
-import { distanceLabel, medal, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
+import { distanceLabel, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
@@ -119,6 +119,14 @@ describe('normalize', () => {
     expect(heatName(' ', 'Quarterfinals', 2, 4)).toBe('Heat 2');
     expect(heatName('', 'Heats', 1, 1)).toBe('Heat 1');
     expect(heatName('Super Final', 'Final', 1, 1)).toBe('Super Final');
+  });
+
+  it('gives each skater in a race a three-letter code', () => {
+    const skater = (name: string, last: string, nation: string | null = null) => ({ name, last, nation });
+    expect(raceCodes([skater('Thomas Nadalini', 'Nadalini'), skater('Wonjun Moon', 'Moon')], false)).toEqual(['NAD', 'MOO']);
+    expect(raceCodes([skater('Jens Van \'t Wout', 'Van \'t Wout'), skater('Melle Van \'t Wout', 'Van \'t Wout'), skater('Sébastien Lepape', 'Lepape')], false))
+      .toEqual(['VAN J', 'VAN M', 'LEP']);
+    expect(raceCodes([skater('Netherlands', 'Netherlands', 'NED'), skater('Canada', 'Canada', 'CAN')], true)).toEqual(['NED', 'CAN']);
   });
 
   it('says "No time" only for a race that is over', () => {

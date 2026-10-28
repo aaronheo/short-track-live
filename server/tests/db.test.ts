@@ -112,7 +112,8 @@ describe.skipIf(!url)('database + API', () => {
     expect(body.results[1]).toMatchObject({ time: '2:19.315', gap: '+0.317', badge: 'Q' });
     expect(body.results[6]).toMatchObject({ rank: null, status: 'PEN', time: 'PEN' });
     expect(body.summary[0]).toBe('Nadalini took the lead on lap 8 and led the last 7 laps.');
-    expect(body.chart).toMatchObject({ laps: 14, winner: 'Nadalini', climber: 'Moon' });
+    expect(body.chart).toMatchObject({ laps: 14, winner: 'NAD', climber: 'MOO' });
+    expect(body.chart.series.map((x: { code: string }) => x.code)).toEqual(['NAD', 'LEE', 'MOO', 'ANT', 'SON', 'BOZ']);
     expect(body.lapTable.rows[7].cells[0]).toEqual({ time: '8.640', best: false, fastest: true });
     expect(body.notes[0]).toMatch(/^Pelletier \(CAN\) was penalized/);
   });

@@ -16,6 +16,21 @@ export function shownTime(timeText: string | null, status: string | null, heatSt
   return timeText ?? (over && !status ? 'No time' : null);
 }
 
+/**
+ * Three-letter codes for a race's skaters, as on TV graphics: "NAD" for
+ * Nadalini. Skaters who'd share one also get their first initial ("VAN J"
+ * and "VAN M" for the Van 't Wouts); relay teams use their nation's code.
+ */
+export function raceCodes(skaters: { name: string; last: string; nation: string | null }[], relay: boolean): string[] {
+  const letters = (s: string) => s.normalize('NFD').replace(/[^A-Za-z]/g, '').toUpperCase();
+  const codes = skaters.map((s) => (relay && s.nation ? s.nation : letters(s.last).slice(0, 3)));
+  return codes.map((code, i) => {
+    if (relay || codes.filter((c) => c === code).length < 2) return code;
+    const initial = letters(skaters[i]!.name.replace(skaters[i]!.last, '')).charAt(0);
+    return initial ? `${code} ${initial}` : code;
+  });
+}
+
 /** 317 → "+0.317" */
 export function gap(ms: number | null | undefined): string | null {
   return ms == null ? null : `+${(ms / 1000).toFixed(3)}`;

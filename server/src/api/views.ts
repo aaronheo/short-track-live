@@ -2,7 +2,7 @@
 // Swift models in ios/ShortTrackLive/Models mirror them.
 
 import { QUALIFIED_CODES } from '../domain/codes.js';
-import { gap, raceTime, shortEventName, shownTime } from '../domain/format.js';
+import { gap, raceCodes, raceTime, shortEventName, shownTime } from '../domain/format.js';
 import type { HeatState } from '../domain/normalize.js';
 import { placesCard, type PlacesCard } from '../domain/places.js';
 import type { QualRule } from '../domain/rules.js';
@@ -56,7 +56,7 @@ export interface HeatResponse {
   heat: { id: number; name: string; state: HeatState; roundId: number; round: string; competition: string; event: string; isRelay: boolean };
   results: EntryView[];
   summary: string[];
-  chart: { laps: number; series: { last: string; iso2: string | null; positions: (number | null)[] }[]; winner: string | null; climber: string | null } | null;
+  chart: { laps: number; series: { last: string; code: string; iso2: string | null; positions: (number | null)[] }[]; winner: string | null; climber: string | null } | null;
   lapTable: { columns: { last: string; iso2: string | null }[]; rows: { lap: number; cells: { time: string | null; best: boolean; fastest: boolean }[] }[] } | null;
   notes: string[];
 }
@@ -201,14 +201,16 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
   let lapTable: HeatResponse['lapTable'] = null;
   if (lapsWhole) {
     const climber = summarize(summaryInput).find((f) => / was \d+\w+ with \d+ laps to go/.test(f))?.split(' was ')[0] ?? null;
+    // Codes, not surnames, tell skaters apart (two Van 't Wouts in one race).
+    const codes = raceCodes(finishers, r.is_relay);
     chart = {
       laps: total,
-      series: finishers.map((e) => {
+      series: finishers.map((e, i) => {
         const byLap = new Map((lapsByEntry.get(e.id) ?? []).map((l) => [l.lap_no, l.position]));
-        return { last: e.last, iso2: e.iso2, positions: Array.from({ length: total }, (_, i) => byLap.get(i + 1) ?? null) };
+        return { last: e.last, code: codes[i]!, iso2: e.iso2, positions: Array.from({ length: total }, (_, i) => byLap.get(i + 1) ?? null) };
       }),
-      winner: finishers[0]?.last ?? null,
-      climber,
+      winner: codes[0] ?? null,
+      climber: climber == null ? null : codes[finishers.findIndex((e) => e.last === climber)] ?? null,
     };
     const all = finishers.flatMap((e) => (lapsByEntry.get(e.id) ?? []).map((l) => l.lap_ms ?? Infinity));
     const fastest = Math.min(...all);
