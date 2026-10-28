@@ -165,7 +165,7 @@ private struct PositionChart: View {
     /// Played through once (or never animated), so later live laps just appear.
     @State private var played = false
 
-    private static let secondsPerLap = 0.26
+    private static let secondsPerLap = 0.38
 
     private struct Point: Identifiable {
         let skater: String
