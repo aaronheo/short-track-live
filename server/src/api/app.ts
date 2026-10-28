@@ -5,6 +5,7 @@ import { RateLimit } from '../chat/chat.js';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
 import { Athletes, type RaceFilters } from './athletes.js';
+import { Favorites } from './favorites.js';
 import { Repo } from './repo.js';
 import { dayOfEvent, eventSummary, heatView, onTheIce, roundView, scheduleView, type EventsResponse } from './views.js';
 
@@ -140,6 +141,17 @@ export function createApp(db: Db, opts: AppOptions = {}) {
       cursor: text(req.query.cursor),
       limit: Number(req.query.limit) || undefined,
     }));
+  }));
+
+  // Favorites live on the phone, which polls this for notifications: ?skaters=12,57,251
+  const favorites = new Favorites(db);
+  app.get('/favorites/races', wrap(async (req, res) => {
+    const ids = (text(req.query.skaters) ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    res.json(await favorites.races([...new Set(ids)].slice(0, 100), now()));
+  }));
+
+  app.get('/favorites/suggested', wrap(async (_req, res) => {
+    res.json(await favorites.suggested());
   }));
 
   // Ask. Body: { messages: [{ role: 'user' | 'assistant', content }] }, the

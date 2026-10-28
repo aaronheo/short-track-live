@@ -25,7 +25,7 @@ const ORDINALS: Record<string, number> = {
   first: 1, second: 2, third: 3, fourth: 4, fifth: 5, '1st': 1, '2nd': 2, '3rd': 3, '4th': 4, '5th': 5,
 };
 const ORD = '(?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)';
-const DESTINATION = /qualify for (?:the )?((?:rep\.? )?(?:final [ab]|semifinals|quarterfinals|heats))/i;
+const DESTINATION = /qualify for (?:the )?((?:rep\.? )?(?:final [ab]\b|final\b|semifinals|quarterfinals|heats))/i;
 
 export function parseRule(text: string | null | undefined): QualRule | null {
   const t = (text ?? '').replace(/\s+/g, ' ').trim();

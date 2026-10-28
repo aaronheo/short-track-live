@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { list, medalNote, ordinal, result, upNext, type AlertRace } from '../src/domain/alerts.js';
 import { shortCountry, statusCode } from '../src/domain/codes.js';
 import { distanceLabel, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
@@ -228,5 +229,50 @@ describe('sync retries', () => {
     expect(isConnectionError(new Error('Query read timeout'))).toBe(true);
     expect(isConnectionError(new Error('timeout exceeded when trying to connect'))).toBe(true);
     expect(isConnectionError(new Error('null value in column "distance" violates not-null constraint'))).toBe(false);
+  });
+});
+
+describe('favorite alerts', () => {
+  const race = (heat: string, round: string, destination: string | null = null): AlertRace => ({
+    competition: 'Women 1000 m', distanceM: 1000, round, heat, destination, event: 'World Tour #1, Vancouver',
+  });
+  const skater = (name: string, rank: number | null, time: string | null, qualification: string | null = null, status: string | null = null) =>
+    ({ name, last: name.split(' ').slice(1).join(' '), rank, time, status, qualification });
+
+  it('says who is up next', () => {
+    expect(upNext(race('Final', 'Finals'), [skater('Courtney Sarault', null, null)])).toEqual({
+      title: 'Courtney Sarault is up next', body: 'Women 1000 m Final · World Tour #1, Vancouver',
+    });
+    expect(upNext(race('Heat 2', 'Semifinals', 'Final A'), [skater('Xandra Velzeboer', null, null), skater('Gilli Kim', null, null), skater('Courtney Sarault', null, null)]))
+      .toEqual({ title: 'Velzeboer, Kim and Sarault are up next', body: 'Women 1000 m Semifinal, Heat 2 · World Tour #1, Vancouver' });
+  });
+
+  it('gives one skater’s result', () => {
+    expect(result(race('Final', 'Finals'), [skater('Minjeong Choi', 1, '1:32.954')]))
+      .toEqual({ title: 'Minjeong Choi won the 1000 m Final', body: '1:32.954 · Women 1000 m · World Tour #1, Vancouver' });
+    expect(result(race('Final', 'Finals'), [skater('Gilli Kim', 5, '1:33.678')]).title).toBe('Gilli Kim 5th in the 1000 m Final');
+    expect(result(race('Final B', 'Finals'), [skater('Courtney Sarault', 1, '1:33.415')]).title).toBe('Courtney Sarault 1st in the 1000 m Final B');
+    expect(result(race('Heat 3', 'Quarterfinals', 'Semifinals'), [skater('Xandra Velzeboer', 1, '1:32.294', 'Q')]))
+      .toEqual({ title: 'Xandra Velzeboer 1st in Quarterfinal, Heat 3', body: '1:32.294 · Qualified for the semifinals · Women 1000 m' });
+    expect(result(race('Heat 2', 'Semifinals', 'Final A'), [skater('Courtney Sarault', 3, '1:31.488', 'QB')]).body)
+      .toBe('1:31.488 · Qualified for Final B · Women 1000 m');
+    expect(result(race('Heat 5', 'Rep. Quarterfinals'), [skater('Gilli Kim', null, 'DNS', null, 'DNS')]))
+      .toEqual({ title: 'Gilli Kim did not start', body: 'Women 1000 m Rep. Quarterfinal, Heat 5 · World Tour #1, Vancouver' });
+  });
+
+  it('puts several favorites in one race in one alert', () => {
+    expect(result(race('Heat 2', 'Semifinals', 'Finals'), [
+      skater('Courtney Sarault', 3, '1:31.488', 'QB'), skater('Xandra Velzeboer', 1, '1:31.289', 'Q'), skater('Gilli Kim', 2, '1:31.388', 'Q'),
+    ])).toEqual({
+      title: 'Velzeboer 1st, Kim 2nd, Sarault 3rd',
+      body: 'Velzeboer and Kim qualified for the final, Sarault for Final B · Women 1000 m Semifinal, Heat 2',
+    });
+  });
+
+  it('writes ordinals, lists and medal notes', () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd']);
+    expect(list(['A', 'B', 'C'])).toBe('A, B and C');
+    expect(medalNote([{ place: 1, distanceM: 1500 }, { place: 1, distanceM: 500 }, { place: 1, distanceM: 1000 }])).toBe('Gold 500, 1000 and 1500 m');
+    expect(medalNote([{ place: 2, distanceM: 500 }, { place: 1, distanceM: 1500 }])).toBe('Gold 1500 m, silver 500 m');
   });
 });

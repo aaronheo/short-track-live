@@ -10,6 +10,8 @@ describe('parseRule', () => {
       { autoPlaces: 2, timeSpots: 2, timePlace: 3, destination: 'Final A' }],
     ['The first placed skater from each race qualify for Quarterfinals.',
       { autoPlaces: 1, timeSpots: 0, timePlace: null, destination: 'Quarterfinals' }],
+    ['The first and second placed skaters from each race and up to a maximum of one fastest third place skater qualify for Final, the third and fourth placed skaters from each race and up to a maximum of next two fastest fifth place skaters qualify for Final B.',
+      { autoPlaces: 2, timeSpots: 1, timePlace: 3, destination: 'Final' }],
     ['The first and second placed teams from each race qualify for Final A, the third and fourth placed teams from each race qualify for Final B.',
       { autoPlaces: 2, timeSpots: 0, timePlace: null, destination: 'Final A' }],
     ['The first placed skater from each race and up to a maximum of four fastest second place skaters qualify for Rep Semifinals.',

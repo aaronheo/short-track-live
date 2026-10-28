@@ -203,6 +203,35 @@ describe.skipIf(!url)('database + API', () => {
     });
   });
 
+  it('GET /favorites/races has the next heat up and official results', async () => {
+    // Men 1500 m QF Heat 5 is racing; the first heat still to race is up next.
+    const next = await one<{ heat_id: number; skater_id: number }>(
+      `select h.id as heat_id, en.skater_id
+       from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+       join event e on e.id = c.event_id join entry en on en.heat_id = h.id
+       where e.slug = $1 and h.state in ('scheduled', 'start_list') and en.skater_id is not null
+       order by h.starts_at, h.run_order nulls last, h.id, en.id limit 1`, [WT1_2026]);
+    const search = await request(app).get('/athletes?q=van%20%27t%20wout').expect(200);
+    const jens = search.body.results.find((r: { name: string }) => r.name === "Jens Van 't Wout").id as number;
+    const { body } = await request(app).get(`/favorites/races?skaters=${next.skater_id},${jens},x`).expect(200);
+    type Race = { heatId: number; upNext: boolean; skaters: number[]; start: { title: string }; result: { title: string; body: string } | null };
+    const races = body.races as Race[];
+    const upcoming = races.find((r) => r.heatId === next.heat_id)!;
+    expect(upcoming).toMatchObject({ upNext: true, result: null, skaters: [next.skater_id] });
+    expect(upcoming.start.title).toMatch(/ is up next$/);
+    expect(races.filter((r) => r.upNext)).toHaveLength(1);
+    // His 500 m heat earlier that evening is official.
+    expect(races.find((r) => r.result?.title === "Jens Van 't Wout 1st in Heat 4")?.result?.body).toMatch(/^40\.699 · Qualified/);
+    expect((await request(app).get('/favorites/races').expect(200)).body).toEqual({ races: [] });
+  });
+
+  it('GET /favorites/suggested lists the latest medalists', async () => {
+    const { body } = await request(app).get('/favorites/suggested').expect(200);
+    expect(body.event).toBe('World Championships');
+    expect(body.skaters.length).toBeGreaterThanOrEqual(9);
+    for (const s of body.skaters) expect(s.note).toMatch(/^(Gold|Silver|Bronze) \d/);
+  });
+
   it('answers 304 when nothing changed', async () => {
     const first = await request(app).get(`/events/${WT1_2026}/schedule`).expect(200);
     await request(app).get(`/events/${WT1_2026}/schedule`).set('If-None-Match', first.headers.etag!).expect(304);
