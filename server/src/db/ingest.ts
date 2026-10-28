@@ -343,7 +343,7 @@ export class Ingest {
     const { results, short, finals, untimed } = res.rows[0]!;
     const parts = [
       Number(results) && `${results} skaters without a result`,
-      Number(short) && `${short} races missing skaters`,
+      Number(short) && `${short} races with skaters left out`,
       Number(finals) && `${finals} distances without a final`,
       Number(untimed) && `${untimed} races without times`,
     ].filter(Boolean);

@@ -55,6 +55,8 @@ function placeTitle(destination: string | null): string {
  */
 export function placesCard(rule: QualRule | null, heats: PlaceHeat[], totalHeats: number): PlacesCard | null {
   const done = heats.filter((h) => FINISHED.includes(h.state));
+  // A round that's over with no results from ISU has no places to show.
+  if (heats.length && done.length === heats.length && done.every((h) => h.entries.every((e) => e.rank == null))) return null;
   const skaters = done.flatMap((h) => h.entries.filter((e) => e.code && AUTO_CODES.has(e.code)));
   if (!rule && skaters.length === 0) return null;
 

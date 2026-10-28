@@ -80,7 +80,7 @@ struct PlacesCardView: View {
             Text(row.pos)
                 .font(.condensed(.title3))
                 .foregroundStyle(row.kind == .out ? Theme.muted : Theme.ink)
-                .frame(width: 18, alignment: .leading)
+                .frame(width: 26, alignment: .leading) // two digits ("10")
             if row.kind == .open {
                 Text("Open")
                     .font(.subheadline)
@@ -172,20 +172,23 @@ struct FinishedHeats: View {
                             RowDivider()
                             ResultRow(entry: entry, medals: heat.name.hasPrefix("Final A") || heat.name == "Final")
                         }
-                        RowDivider()
-                        Button { model.openHeat(heat.id) } label: {
-                            HStack {
-                                Text("Lap times and race summary")
-                                Spacer()
-                                Chevron(color: Theme.link)
+                        // Nothing more to see where ISU has no laps for the race.
+                        if heat.entries.contains(where: { $0.laps > 0 }) {
+                            RowDivider()
+                            Button { model.openHeat(heat.id) } label: {
+                                HStack {
+                                    Text("Lap times and race summary")
+                                    Spacer()
+                                    Chevron(color: Theme.link)
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.link)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 44)
+                                .contentShape(.rect)
                             }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.link)
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 44)
-                            .contentShape(.rect)
+                            .buttonStyle(RowButtonStyle())
                         }
-                        .buttonStyle(RowButtonStyle())
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
