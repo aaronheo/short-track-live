@@ -147,6 +147,8 @@ describe('sync retries', () => {
     expect(isConnectionError(Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }))).toBe(true);
     expect(isConnectionError(new Error('Connection terminated unexpectedly'))).toBe(true);
     expect(isConnectionError(new Error('Client has encountered a connection error and is not queryable'))).toBe(true);
+    expect(isConnectionError(new Error('Query read timeout'))).toBe(true);
+    expect(isConnectionError(new Error('timeout exceeded when trying to connect'))).toBe(true);
     expect(isConnectionError(new Error('null value in column "distance" violates not-null constraint'))).toBe(false);
   });
 });

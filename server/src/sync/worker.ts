@@ -235,5 +235,5 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function isConnectionError(err: unknown): boolean {
   const e = err as { code?: string; message?: string };
   return ['ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'EPIPE', 'ECONNREFUSED'].includes(e.code ?? '')
-    || /Connection terminated|not queryable|connection error/i.test(e.message ?? '');
+    || /Connection terminated|not queryable|connection error|Query read timeout|timeout exceeded when trying to connect/i.test(e.message ?? '');
 }
