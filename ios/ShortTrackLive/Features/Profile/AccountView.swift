@@ -97,11 +97,9 @@ struct AccountRow: View {
     }
 }
 
-/// The account: what's saved in it, sign out, delete.
+/// The account: who's signed in, sign out, delete.
 struct AccountView: View {
     @Environment(AccountStore.self) private var account
-    @Environment(Favorites.self) private var favorites
-    @AppStorage("appearance") private var appearance = Appearance.system
     @Environment(\.dismiss) private var dismiss
     @State private var confirmSignOut = false
     @State private var confirmDelete = false
@@ -120,26 +118,15 @@ struct AccountView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                VStack(spacing: 0) {
-                    row("Name", account.account?.name ?? "–")
-                    RowDivider(leading: 16)
-                    row("Email", account.account?.email ?? "–")
-                }
-                .card()
-                .clipShape(.rect(cornerRadius: 16))
-
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Saved to your account").sectionLabel().padding(.leading, 16)
                     VStack(spacing: 0) {
-                        row("Favorite skaters", "\(favorites.skaters.count)")
+                        row("Name", account.account?.name ?? "–")
                         RowDivider(leading: 16)
-                        row("Notifications", notifications)
-                        RowDivider(leading: 16)
-                        row("Appearance", appearanceText)
+                        row("Email", account.account?.email ?? "–")
                     }
                     .card()
                     .clipShape(.rect(cornerRadius: 16))
-                    Text("\(account.syncedAt == nil ? "Saved" : "Synced \(account.syncedAt!.formatted(.relative(presentation: .named)))"). Sign in on another iPhone or iPad to get these back.")
+                    Text("Your favorites and settings sync to this account.\(synced)")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                         .padding(.horizontal, 16)
@@ -195,21 +182,9 @@ struct AccountView: View {
         }
     }
 
-    private var notifications: String {
-        switch (favorites.notifyStarts, favorites.notifyResults) {
-        case (true, true): "Starts and results"
-        case (true, false): "Starts"
-        case (false, true): "Results"
-        case (false, false): "Off"
-        }
-    }
-
-    private var appearanceText: String {
-        switch appearance {
-        case .system: "Match iPhone"
-        case .light: "Light"
-        case .dark: "Dark"
-        }
+    private var synced: String {
+        guard let date = account.syncedAt else { return "" }
+        return Date.now.timeIntervalSince(date) < 60 ? " Synced just now." : " Synced \(date.formatted(.relative(presentation: .named)))."
     }
 
     private func row(_ title: String, _ value: String) -> some View {

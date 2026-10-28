@@ -97,9 +97,7 @@ final class AccountStore {
             favorites.replace(with: favorites.skaters + added)
             synced = SavedState(skaters: reply.favorites, settings: reply.settings)
             account = reply.account
-            notice = added.isEmpty
-                ? "Signed in. Your favorites are saved to your account."
-                : "Signed in. \(added.count) favorite\(added.count == 1 ? "" : "s") added from your account."
+            notice = "Signed in. Favorites and settings are synced."
             await push()
         } catch is CancellationError {
         } catch {
