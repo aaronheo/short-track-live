@@ -67,7 +67,12 @@ export class Repo {
       `select e.id, e.slug, e.name, e.series, e.city, n.name as country_name, n.iso2, e.time_zone,
          to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on, e.state
        from event e join season s on s.id = e.season_id left join nation n on n.code = e.country_code
-       where s.title = $1 order by e.starts_on, e.id`, [seasonTitle]);
+       where s.title = $1
+         -- ISU lists events it has no results for (cancelled in 2020/21), and
+         -- once a placeholder copy of an event, named just by its slug ("wjc2022").
+         and (e.ends_on >= current_date or exists (select 1 from competition c where c.event_id = e.id))
+         and e.name <> e.slug
+       order by e.starts_on, e.id`, [seasonTitle]);
     return res.rows;
   }
 

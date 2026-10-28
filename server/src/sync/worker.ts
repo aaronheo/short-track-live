@@ -11,6 +11,8 @@ const START_LISTS_EVERY = 10 * 60_000; // upcoming rounds in the next 24 h
 const EVENT_LIST_EVERY = 24 * 60 * 60_000; // current season's event list
 const LIVE_EVENT_LIST_EVERY = 30 * 60_000; // ...more often while an event is live, to see it finish
 const HOT_WINDOW = 15 * 60_000;
+// ISU's results before this season are fragments: one race per round, a few skaters in each.
+const HISTORY_FROM = '2019/2020';
 const FINISH_CHECK_EVERY = 10 * 60_000; // a finished event, until all its heats are official
 
 type Log = (msg: string) => void;
@@ -76,9 +78,9 @@ export class SyncWorker {
     }
   }
 
-  /** Every season ISU lists, newest first (for the one-off history backfill). */
+  /** Every season ISU has full results for, newest first (for the one-off history backfill). */
   async allSeasons(): Promise<string[]> {
-    return (await this.isu.seasons()).map((s) => s.title);
+    return (await this.isu.seasons()).map((s) => s.title).filter((t) => t >= HISTORY_FROM);
   }
 
   private async dbBytes(): Promise<number> {

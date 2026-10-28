@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { shortCountry } from '../src/domain/codes.js';
 import { distanceLabel, medal, roundLabel, shortEventName } from '../src/domain/format.js';
-import { normalizeEntries, titleName } from '../src/domain/normalize.js';
+import { competitionName, genderName, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
 import { summarize } from '../src/domain/summary.js';
@@ -71,6 +71,37 @@ describe('normalize', () => {
     expect(titleName("VAN 'T WOUT")).toBe("Van 't Wout");
     expect(titleName('GAGNON-LAMARCHE')).toBe('Gagnon-Lamarche');
     expect(titleName('Sighel')).toBe('Sighel');
+  });
+
+  it('spells each distance one way, gender first', () => {
+    const cases: [string, string, boolean, string][] = [
+      ['1000 m', 'Ladies', false, 'Women 1000 m'],
+      ['1000 M', 'Men', false, 'Men 1000 m'],
+      ['1000m (2)', 'Ladies', false, 'Women 1000 m (2)'],
+      ['Ladies 500 m', 'Ladies', false, 'Women 500 m'],
+      ['Women 500 m ', 'Ladies', false, 'Women 500 m'],
+      ["Men's 1000m", 'Men', false, 'Men 1000 m'],
+      ['Men 1000 m', 'Men', false, 'Men 1000 m'],
+      ['1500 m SF', 'Men', false, 'Men 1500 m Superfinal'],
+      ['1500 M Super Final', 'Ladies', false, 'Women 1500 m Superfinal'],
+      ['Women 3000 m Superfinal', 'Ladies', false, 'Women 3000 m Superfinal'],
+      ['3000m Relay', 'Ladies', true, 'Women 3000 m Relay'],
+      ['Women Relay 3000 m', 'Women', true, 'Women 3000 m Relay'],
+      ["Men's 5000m Relay", 'Men', true, 'Men 5000 m Relay'],
+      ['2000 m Relay', 'Mixed', true, 'Mixed Team Relay'],
+      ['Mixed Relay 2000 m', 'Mixed', true, 'Mixed Team Relay'],
+    ];
+    for (const [name, gender, relay, want] of cases) expect(competitionName(name, gender, relay)).toBe(want);
+    expect(genderName('Ladies')).toBe('Women');
+    expect(genderName('Mixed')).toBe('Mixed');
+  });
+
+  it('spells out abbreviated rounds', () => {
+    expect(roundName('REPQ')).toBe('Rep. Quarterfinals');
+    expect(roundName('HEAS')).toBe('Heats');
+    expect(roundName('Rep Semifinals')).toBe('Rep. Semifinals');
+    expect(roundName('Rep. Heats')).toBe('Rep. Heats');
+    expect(roundName('Final A')).toBe('Final A');
   });
 });
 

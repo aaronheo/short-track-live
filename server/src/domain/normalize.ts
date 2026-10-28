@@ -73,6 +73,36 @@ export function titleName(s: string): string {
     .join('');
 }
 
+/** ISU's older events say "Ladies" where newer ones say "Women". */
+export function genderName(gender: string): string {
+  return /^ladies$/i.test(gender.trim()) ? 'Women' : gender.trim();
+}
+
+/**
+ * One spelling per distance, gender first. ISU writes the same distance as
+ * "1000m", "Ladies 1000 M", "Women's 1000m" or "Women Relay 3000 m"; these
+ * become "Women 1000 m", "Women 3000 m Relay", "Men 1500 m Superfinal".
+ */
+export function competitionName(name: string, gender: string, relay: boolean): string {
+  const g = genderName(gender);
+  if (g === 'Mixed' && relay) return 'Mixed Team Relay';
+  const rest = name.trim()
+    .replace(/^(men|women|ladies|mixed)('s)?\s+/i, '')
+    .replace(/(\d+)\s*m\b/gi, '$1 m')
+    .replace(/^relay\s+(\d+ m)/i, '$1 Relay')
+    .replace(/\b(SF|super\s*final)\b/i, 'Superfinal')
+    .replace(/\s+/g, ' ');
+  return `${g} ${rest}`;
+}
+
+const ROUND_CODES: Record<string, string> = { HEAS: 'Heats', REPH: 'Rep. Heats', REPQ: 'Rep. Quarterfinals', REPS: 'Rep. Semifinals' };
+
+/** "REPQ" and "Rep Semifinals" read as "Rep. Quarterfinals" and "Rep. Semifinals". */
+export function roundName(name: string): string {
+  const s = name.trim();
+  return ROUND_CODES[s.toUpperCase()] ?? s.replace(/^Rep\s+/i, 'Rep. ');
+}
+
 export function normalizeEntry(c: IsuCompetitor): Entry {
   const { name, last } = names(c);
   const text = (c.final_result ?? '').trim();

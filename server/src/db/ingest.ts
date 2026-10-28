@@ -2,7 +2,7 @@ import type { Db } from './pool.js';
 import { isRelay } from '../isu/client.js';
 import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSkater } from '../isu/types.js';
 import { iso2, shortCountry } from '../domain/codes.js';
-import { heatState, normalizeEntries, titleName, type Entry } from '../domain/normalize.js';
+import { competitionName, genderName, heatState, normalizeEntries, roundName, titleName, type Entry } from '../domain/normalize.js';
 import { parseRule } from '../domain/rules.js';
 import { isuLocalDate, localWallClockToUtc, utc, venueTimeZone } from '../domain/time.js';
 
@@ -59,7 +59,7 @@ export class Ingest {
         const rid = ids.get(rnd.event_result_round_id)!;
         roundIds.set(rnd.event_result_round_id, rid);
         roundKeys.set(norm(comp.name) + '|' + norm(rnd.name), rid);
-        named.push({ title: comp.name, label: rnd.name, roundId: rid });
+        named.push({ title: competitionName(comp.name, comp.gender, isRelay(comp)), label: roundName(rnd.name), roundId: rid });
         await this.loadHeats(rid, loaded.timeZone, rnd.heats, isRelay(comp));
       }
     }
@@ -120,8 +120,8 @@ export class Ingest {
       ['isu_id', 'int'], ['api_id', 'uuid'], ['event_id', 'int'], ['name', 'text'], ['gender', 'text'],
       ['distance_m', 'int'], ['is_relay', 'bool'], ['display_order', 'smallint'], ['state', 'event_state'],
     ], [{
-      isu_id: comp.event_result_id, api_id: comp.api_id || null, event_id: eventId, name: comp.name,
-      gender: comp.gender, distance_m: /^\d+$/.test(dist) ? Number(dist) : null, is_relay: isRelay(comp),
+      isu_id: comp.event_result_id, api_id: comp.api_id || null, event_id: eventId,
+      name: competitionName(comp.name, comp.gender, isRelay(comp)), gender: genderName(comp.gender), distance_m: /^\d+$/.test(dist) ? Number(dist) : null, is_relay: isRelay(comp),
       display_order: comp.display_order, state: eventState(comp.status),
     }]);
     return ids.get(comp.event_result_id)!;
@@ -135,7 +135,7 @@ export class Ingest {
     ], rounds.map((r) => {
       const rule = parseRule(r.qualification_rule);
       return {
-        isu_id: r.event_result_round_id, competition_id: competitionId, name: r.name,
+        isu_id: r.event_result_round_id, competition_id: competitionId, name: roundName(r.name),
         display_order: r.display_order, qualification_rule: r.qualification_rule || null,
         auto_places: rule?.autoPlaces ?? null, time_spots: rule?.timeSpots ?? null,
         time_place: rule?.timePlace ?? null, destination: rule?.destination ?? null,
