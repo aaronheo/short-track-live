@@ -1,19 +1,36 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct ShortTrackLiveApp: App {
+    @Environment(\.scenePhase) private var phase
+
+    init() {
+        UNUserNotificationCenter.current().delegate = AlertDelegate.shared
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
         }
+        // Checks favorites' races for notifications when iOS gives the app time.
+        .backgroundTask(.appRefresh(RaceAlerts.refreshTask)) {
+            await RaceAlerts.shared.backgroundRefresh()
+        }
+        .onChange(of: phase) { _, phase in
+            if phase == .background { RaceAlerts.shared.scheduleRefresh() }
+        }
     }
 }
 
-/// Tabs: Events, Settings, and Search (iOS's search tab, which sits apart).
+/// Tabs: Events, Profile, and Search (iOS's search tab, which sits apart).
 /// Wide windows (iPad, Duo unfolded: about 626 pt portrait, 890 landscape)
 /// get sidebar layouts; phones get one stack per tab.
 struct RootView: View {
     @State private var model = AppModel()
+    @State private var favorites = Favorites.shared
+    @State private var inbox = AlertInbox.shared
+    @Environment(\.scenePhase) private var phase
     @State private var split = false
     @State private var tabBarAtSide = false
     @AppStorage("appearance") private var appearance = Appearance.system
@@ -23,8 +40,8 @@ struct RootView: View {
             Tab("Events", systemImage: "calendar", value: AppTab.events) {
                 if split { SplitLayout() } else { StackLayout() }
             }
-            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                SettingsView()
+            Tab("Profile", systemImage: "person.crop.circle", value: AppTab.profile) {
+                ProfileView()
             }
             Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
                 SearchTab(split: split, tabBarAtSide: tabBarAtSide)
@@ -38,9 +55,26 @@ struct RootView: View {
         // edge: an inset on that side only (a landscape phone has both sides inset).
         .onGeometryChange(for: Bool.self) { $0.safeAreaInsets.trailing > $0.safeAreaInsets.leading + 20 } action: { tabBarAtSide = $0 }
         .environment(model)
+        .environment(favorites)
         .tint(Theme.link)
         .preferredColorScheme(appearance.colorScheme)
         .onOpenURL { model.open($0) }
+        // A tapped notification opens its race.
+        .onChange(of: inbox.url, initial: true) { _, url in
+            guard let url else { return }
+            model.open(url)
+            inbox.url = nil
+        }
+        // While the app is open, check favorites' races: every 30 s while
+        // one is racing, else every 5 minutes.
+        .task(id: phase == .active) {
+            guard phase == .active else { return }
+            while !Task.isCancelled {
+                let busy = await RaceAlerts.shared.check(favorites)
+                try? await Task.sleep(for: busy ? .seconds(30) : .seconds(300))
+            }
+        }
+        .onChange(of: favorites.skaters) { Task { await RaceAlerts.shared.check(favorites) } }
     }
 }
 

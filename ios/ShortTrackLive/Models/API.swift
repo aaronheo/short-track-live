@@ -403,3 +403,48 @@ struct RacesResponse: Decodable, Sendable {
     let nextCursor: String?
     let facets: RaceFacets?
 }
+
+// MARK: - Favorites
+
+/// GET /favorites/races?skaters=…: the favorites' races around now, with the
+/// notification text for each.
+struct FavoriteRacesResponse: Decodable, Sendable {
+    let races: [FavoriteRace]
+}
+
+struct FavoriteRace: Decodable, Sendable, Equatable {
+    struct Text: Decodable, Sendable, Equatable {
+        let title: String
+        let body: String
+    }
+
+    let heatId: Int
+    let roundId: Int
+    let event: String
+    /// Planned start until the heat is raced, then the actual start.
+    let startsAt: Date?
+    let state: String
+    /// The next heat on the ice at a live event, due within a few minutes.
+    let upNext: Bool
+    /// The favorites in it.
+    let skaters: [Int]
+    let start: Text
+    /// Once the heat is official.
+    let result: Text?
+}
+
+/// GET /favorites/suggested: the latest event's medalists.
+struct SuggestedSkatersResponse: Decodable, Sendable {
+    struct Skater: Decodable, Sendable, Identifiable {
+        let id: Int
+        let name: String
+        let last: String
+        let nat: String?
+        let iso2: String?
+        let gender: String?
+        let note: String // "Gold 500, 1000 and 1500 m"
+    }
+
+    let event: String?
+    let skaters: [Skater]
+}

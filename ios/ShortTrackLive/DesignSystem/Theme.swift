@@ -38,6 +38,8 @@ enum Theme {
     static let gold = Color(hex: 0xD4A72C)
     static let silver = Color(hex: 0x9AA5B1)
     static let bronze = Color(hex: 0xB87333)
+    /// Favorite star (darker than gold so it reads on white).
+    static let star = Color(light: 0xB7791F, dark: 0xE0A82E)
 }
 
 extension Color {

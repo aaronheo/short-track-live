@@ -40,6 +40,11 @@ struct AthleteView: View {
             }
         }
         .screen(title: live.value?.athlete.last ?? "Athlete")
+        .toolbar {
+            if let athlete = live.value?.athlete {
+                ToolbarItem(placement: .topBarTrailing) { FavoriteButton(athlete: athlete) }
+            }
+        }
         .task { await live.run() }
         .task(id: races.generation) { await races.loadFirstPage() }
     }
