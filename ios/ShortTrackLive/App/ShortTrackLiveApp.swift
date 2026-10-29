@@ -84,6 +84,8 @@ struct RootView: View {
             }
         }
         .onChange(of: favorites.skaters) { Task { await RaceAlerts.shared.check(favorites) } }
+        .onChange(of: favorites.notifyPicks) { Task { await RaceAlerts.shared.check(favorites) } }
+        .onChange(of: account.signedIn) { Task { await RaceAlerts.shared.check(favorites) } }
         .onChange(of: appearance) { account.localChanged() }
     }
 }

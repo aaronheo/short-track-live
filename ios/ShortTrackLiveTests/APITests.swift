@@ -160,6 +160,14 @@ struct NavigationTests {
         #expect(model.tab == .events)
     }
 
+    @Test func pickDeepLinkOpensThePicksTab() {
+        let model = AppModel()
+        model.open(URL(string: "shorttrack://pick/812")!)
+        #expect(model.tab == .picks)
+        #expect(model.pickHeat == 812)
+        #expect(model.path.isEmpty)
+    }
+
     @Test func onTheIceOpensTheScheduleUnderneath() {
         let model = AppModel()
         model.openRound(35, event: "wt1")

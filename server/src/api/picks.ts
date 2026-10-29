@@ -12,6 +12,7 @@ export interface PickSummary {
   heatId: number;
   title: string; // "Women 1000 m"
   race: string; // "Semifinal · Heat 2", "Final A"
+  round: string; // "Semifinals": picks-open alerts come one per round
   startsAt: string | null;
   state: HeatState;
   picked: boolean;
@@ -104,7 +105,7 @@ export class Picks {
     const summary = (h: HeatRow): PickSummary => {
       const s = mine.get(h.id);
       return {
-        heatId: h.id, ...summaryTitle(h), startsAt: h.starts_at?.toISOString() ?? null, state: h.state,
+        heatId: h.id, ...summaryTitle(h), round: h.round, startsAt: h.starts_at?.toISOString() ?? null, state: h.state,
         picked: !!s, points: s?.score?.points ?? null, max: s?.score?.max ?? null,
       };
     };

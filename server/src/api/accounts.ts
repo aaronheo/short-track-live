@@ -13,6 +13,8 @@ export type VerifyGoogle = (idToken: string) => Promise<GoogleIdentity>;
 export interface Settings {
   notifyStarts?: boolean;
   notifyResults?: boolean;
+  /** A notification when a round's races open for picks. */
+  notifyPicks?: boolean;
   appearance?: 'system' | 'light' | 'dark';
 }
 
@@ -45,6 +47,7 @@ export function cleanSettings(raw: unknown): Settings {
   const out: Settings = {};
   if (typeof r.notifyStarts === 'boolean') out.notifyStarts = r.notifyStarts;
   if (typeof r.notifyResults === 'boolean') out.notifyResults = r.notifyResults;
+  if (typeof r.notifyPicks === 'boolean') out.notifyPicks = r.notifyPicks;
   if (r.appearance === 'system' || r.appearance === 'light' || r.appearance === 'dark') out.appearance = r.appearance;
   return out;
 }

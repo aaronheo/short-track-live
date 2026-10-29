@@ -21,6 +21,8 @@ final class Favorites {
     private(set) var skaters: [FavoriteSkater]
     var notifyStarts: Bool { didSet { defaults.set(notifyStarts, forKey: Keys.starts); onChange?() } }
     var notifyResults: Bool { didSet { defaults.set(notifyResults, forKey: Keys.results); onChange?() } }
+    /// When races open for picks (signed in only).
+    var notifyPicks: Bool { didSet { defaults.set(notifyPicks, forKey: Keys.picks); onChange?() } }
     /// The first star asks about notifications, once.
     var askedAboutNotifications: Bool { didSet { defaults.set(askedAboutNotifications, forKey: Keys.asked) } }
 
@@ -33,6 +35,7 @@ final class Favorites {
         skaters = defaults.data(forKey: Keys.skaters).flatMap { try? JSONDecoder().decode([FavoriteSkater].self, from: $0) } ?? []
         notifyStarts = defaults.object(forKey: Keys.starts) as? Bool ?? true
         notifyResults = defaults.object(forKey: Keys.results) as? Bool ?? true
+        notifyPicks = defaults.object(forKey: Keys.picks) as? Bool ?? true
         askedAboutNotifications = defaults.bool(forKey: Keys.asked)
     }
 
@@ -64,6 +67,7 @@ final class Favorites {
         static let skaters = "favoriteSkaters"
         static let starts = "notifyRaceStarts"
         static let results = "notifyRaceResults"
+        static let picks = "notifyPicksOpen"
         static let asked = "askedAboutNotifications"
     }
 }

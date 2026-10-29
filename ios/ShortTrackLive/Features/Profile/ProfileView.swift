@@ -152,7 +152,7 @@ struct ProfileView: View {
     private var notificationsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             section("Notifications") {
-                NotificationToggles { if permission == .notDetermined { Task { await allow() } } }
+                NotificationToggles(picks: account.signedIn) { if permission == .notDetermined { Task { await allow() } } }
             }
             Group {
                 switch permission {
@@ -164,7 +164,8 @@ struct ProfileView: View {
                         }
                         .fontWeight(.semibold)
                     }
-                case .notDetermined where !favorites.skaters.isEmpty && (favorites.notifyStarts || favorites.notifyResults):
+                case .notDetermined where (!favorites.skaters.isEmpty && (favorites.notifyStarts || favorites.notifyResults))
+                    || (account.signedIn && favorites.notifyPicks):
                     Button("Turn on notifications") { Task { await allow() } }
                         .fontWeight(.semibold)
                 default:
@@ -263,9 +264,11 @@ struct ProfileView: View {
     }
 }
 
-/// The two notification switches, in Profile and in the first-star prompt.
+/// The notification switches, in Profile and in the first-star prompt.
 struct NotificationToggles: View {
     @Environment(Favorites.self) private var favorites
+    /// Show the picks switch (signed in, in Profile).
+    var picks = false
     /// Called when a switch is turned on.
     var turnedOn: () -> Void = {}
 
@@ -276,9 +279,14 @@ struct NotificationToggles: View {
             RowDivider(leading: 16)
             toggle("Race results", note: favorites.notifyResults ? "Place, time and whether they advanced" : "Off, so nothing gets spoiled",
                    isOn: $favorites.notifyResults)
+            if picks {
+                RowDivider(leading: 16)
+                toggle("Picks are open", note: "When a quarterfinal, semifinal or final gets its start list", isOn: $favorites.notifyPicks)
+            }
         }
         .onChange(of: favorites.notifyStarts) { _, on in if on { turnedOn() } }
         .onChange(of: favorites.notifyResults) { _, on in if on { turnedOn() } }
+        .onChange(of: favorites.notifyPicks) { _, on in if on { turnedOn() } }
     }
 
     private func toggle(_ title: String, note: String, isOn: Binding<Bool>) -> some View {

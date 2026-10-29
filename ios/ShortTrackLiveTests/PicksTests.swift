@@ -38,4 +38,23 @@ struct PicksTests {
         #expect(Fmt.pickPlace(nil) == "Penalty")
         #expect(Fmt.pickPlace(2) == "2nd")
     }
+
+    @Test func picksOpenAlertsComeOncePerRound() {
+        func race(_ id: Int, _ title: String, _ race: String, _ round: String, picked: Bool = false) -> PickSummary {
+            PickSummary(heatId: id, title: title, race: race, round: round, startsAt: nil, state: "start_list", picked: picked, points: nil, max: nil)
+        }
+        let open = [race(1, "Women 1000 m", "Semifinal · Heat 1", "Semifinals"),
+                    race(2, "Women 1000 m", "Semifinal · Heat 2", "Semifinals"),
+                    race(3, "Men 500 m", "Final A", "Finals"),
+                    race(4, "Men 500 m", "Final B", "Finals", picked: true)]
+        let event = PicksHome.Event(slug: "wt2", name: "World Tour #2", city: "Montréal", state: "live")
+        let plan = PicksAlertPlan.make(open: open, event: event, notified: [])
+        #expect(plan.post.map(\.title) == ["Picks are open: Women 1000 m semifinals", "Picks are open: Men 500 m finals"])
+        #expect(plan.post.map(\.body) == ["2 races · Montréal. Lock in your order before the start.",
+                                         "Final A · Montréal. Lock in your order before the start."])
+        #expect(plan.post.allSatisfy { $0.link == "pick" })
+        #expect(plan.done == ["picks-1", "picks-2", "picks-3"])
+        // Already told: nothing new.
+        #expect(PicksAlertPlan.make(open: open, event: event, notified: plan.done).post.isEmpty)
+    }
 }

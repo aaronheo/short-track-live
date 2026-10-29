@@ -19,6 +19,8 @@ enum AppTab: Hashable {
 @MainActor @Observable
 final class AppModel {
     var tab: AppTab = .events
+    /// A race to open in the Picks tab (from a "picks are open" alert).
+    var pickHeat: Int?
 
     // Events tab. Phone:
     var path: [Route] = []
@@ -136,11 +138,15 @@ final class AppModel {
         if isSplit { detailPath.append(.heat(id)) } else { path.append(.heat(id)) }
     }
 
-    /// shorttrack://event/<slug>, shorttrack://round/<id>, shorttrack://heat/<id>, shorttrack://athlete/<id>
+    /// shorttrack://event/<slug>, shorttrack://round/<id>, shorttrack://heat/<id>, shorttrack://athlete/<id>, shorttrack://pick/<heat id>
     func open(_ url: URL) {
         guard url.scheme == "shorttrack", let kind = url.host(), let value = url.pathComponents.dropFirst().first else { return }
         if kind == "athlete" {
             if let id = Int(value) { openAthlete(id) }
+            return
+        }
+        if kind == "pick" {
+            if let id = Int(value) { tab = .picks; pickHeat = id }
             return
         }
         tab = .events

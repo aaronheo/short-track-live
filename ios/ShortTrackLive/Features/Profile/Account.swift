@@ -13,6 +13,7 @@ struct AccountInfo: Codable, Equatable, Sendable {
 struct AccountSettings: Codable, Equatable, Sendable {
     var notifyStarts: Bool?
     var notifyResults: Bool?
+    var notifyPicks: Bool?
     var appearance: String?
 }
 
@@ -190,13 +191,14 @@ final class AccountStore {
         favorites.replace(with: state.favorites)
         if let on = state.settings.notifyStarts { favorites.notifyStarts = on }
         if let on = state.settings.notifyResults { favorites.notifyResults = on }
+        if let on = state.settings.notifyPicks { favorites.notifyPicks = on }
         if let mode = state.settings.appearance { defaults.set(mode, forKey: "appearance") }
     }
 
     /// This iPhone's favorites and settings.
     private var current: SavedState {
         SavedState(skaters: favorites.skaters, settings: AccountSettings(
-            notifyStarts: favorites.notifyStarts, notifyResults: favorites.notifyResults,
+            notifyStarts: favorites.notifyStarts, notifyResults: favorites.notifyResults, notifyPicks: favorites.notifyPicks,
             appearance: defaults.string(forKey: "appearance") ?? "system"))
     }
 

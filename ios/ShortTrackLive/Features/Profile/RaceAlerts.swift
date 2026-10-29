@@ -18,6 +18,8 @@ struct AlertPlan: Equatable {
         let event: String
         /// When to show it; nil = now.
         var at: Date?
+        /// What a tap opens: shorttrack://<link>/<heatId>.
+        var link = "heat"
     }
 
     var post: [Alert] = []
@@ -67,6 +69,37 @@ struct AlertPlan: Equatable {
     }
 }
 
+/// "Picks are open" alerts: one per round whose races just got start lists
+/// (skaters qualify into quarterfinals, semifinals and finals, so a round can
+/// only be picked once the one before it is done). Pure, so it can be tested.
+struct PicksAlertPlan: Equatable {
+    var post: [AlertPlan.Alert] = []
+    /// The races those alerts cover, so they don't come again.
+    var done: Set<String> = []
+
+    static func make(open: [PickSummary], event: PicksHome.Event?, notified: Set<String>) -> PicksAlertPlan {
+        var plan = PicksAlertPlan()
+        var rounds: [String: [PickSummary]] = [:], order: [String] = []
+        for race in open where !race.picked && !notified.contains(id(race)) {
+            let name = [race.title, race.round?.lowercased()].compactMap { $0 }.joined(separator: " ")
+            if rounds[name] == nil { order.append(name) }
+            rounds[name, default: []].append(race)
+        }
+        let place = event.map { " · \($0.city ?? $0.name)" } ?? ""
+        for name in order {
+            let races = rounds[name]!
+            let what = races.count == 1 ? races[0].race : "\(races.count) races"
+            plan.post.append(AlertPlan.Alert(
+                id: id(races[0]), title: "Picks are open: \(name)", body: "\(what)\(place). Lock in your order before the start.",
+                heatId: races[0].heatId, event: "picks", link: "pick"))
+            plan.done.formUnion(races.map(id))
+        }
+        return plan
+    }
+
+    static func id(_ race: PickSummary) -> String { "picks-\(race.heatId)" }
+}
+
 /// Runs the checks: while the app is open (RootView), and in background
 /// refreshes, which iOS schedules when it sees fit.
 @MainActor
@@ -76,7 +109,10 @@ final class RaceAlerts {
 
     private let center = UNUserNotificationCenter.current()
     private let defaults = UserDefaults.standard
-    private(set) var busy = false
+    /// A favorite is racing soon, or an event with picks is on: check often.
+    var busy: Bool { racesBusy || picksBusy }
+    private var racesBusy = false
+    private var picksBusy = false
 
     func status() async -> UNAuthorizationStatus {
         await center.notificationSettings().authorizationStatus
@@ -88,14 +124,18 @@ final class RaceAlerts {
         (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
     }
 
-    /// Checks the favorites' races. Returns whether to check again soon.
+    /// Checks the favorites' races and races open for picks. Returns whether to check again soon.
     @discardableResult
     func check(_ favorites: Favorites = .shared) async -> Bool {
-        let allowed: Set<UNAuthorizationStatus> = [.authorized, .provisional, .ephemeral]
-        guard allowed.contains(await status()), !favorites.skaters.isEmpty,
-              favorites.notifyStarts || favorites.notifyResults else {
+        let allowed = ([.authorized, .provisional, .ephemeral] as Set<UNAuthorizationStatus>).contains(await status())
+        racesBusy = await checkRaces(favorites, allowed: allowed)
+        picksBusy = await checkPicks(favorites, allowed: allowed)
+        return busy
+    }
+
+    private func checkRaces(_ favorites: Favorites, allowed: Bool) async -> Bool {
+        guard allowed, !favorites.skaters.isEmpty, favorites.notifyStarts || favorites.notifyResults else {
             await removePendingStarts(keeping: [])
-            busy = false
             return false
         }
         let ids = favorites.skaters.map { String($0.id) }.joined(separator: ",")
@@ -104,9 +144,9 @@ final class RaceAlerts {
             response = try await APIClient.shared.get("favorites/races", query: [URLQueryItem(name: "skaters", value: ids)],
                                                       cached: false, as: FavoriteRacesResponse.self)
         } catch {
-            return busy
+            return racesBusy
         }
-        guard let response else { return busy }
+        guard let response else { return racesBusy }
 
         let now = Date.now
         var handled = load(Keys.handled)
@@ -134,13 +174,26 @@ final class RaceAlerts {
         scheduled = scheduled.filter { now.timeIntervalSince($0.value) < 2 * 86400 }
         save(handled, Keys.handled)
         save(scheduled, Keys.scheduled)
-        busy = plan.busy
         return plan.busy
     }
 
-    /// Asks iOS for a background check: soon while a favorite is racing, else in half an hour.
+    /// Signed in with picks alerts on: a notification when a round's races open for picks.
+    private func checkPicks(_ favorites: Favorites, allowed: Bool) async -> Bool {
+        guard allowed, favorites.notifyPicks, let session = Keychain.session else { return false }
+        guard let home = try? await APIClient.shared.send("GET", "/picks", account: session, as: PicksHome.self) else { return picksBusy }
+        let now = Date.now
+        var notified = load(Keys.picks)
+        let plan = PicksAlertPlan.make(open: home.open, event: home.event, notified: Set(notified.keys))
+        for alert in plan.post { try? await center.add(request(alert, trigger: nil)) }
+        for id in plan.done { notified[id] = now }
+        save(notified.filter { now.timeIntervalSince($0.value) < 7 * 86400 }, Keys.picks)
+        return home.event?.state == "live"
+    }
+
+    /// Asks iOS for a background check: soon while a favorite is racing or picks are coming, else in half an hour.
     func scheduleRefresh() {
-        guard !Favorites.shared.skaters.isEmpty else { return }
+        let favorites = Favorites.shared
+        guard !favorites.skaters.isEmpty || (favorites.notifyPicks && Keychain.session != nil) else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.refreshTask)
         request.earliestBeginDate = Date(timeIntervalSinceNow: busy ? 5 * 60 : 30 * 60)
         try? BGTaskScheduler.shared.submit(request)
@@ -167,7 +220,7 @@ final class RaceAlerts {
         content.body = alert.body
         content.sound = .default
         content.threadIdentifier = alert.event
-        content.userInfo = ["url": "shorttrack://heat/\(alert.heatId)"]
+        content.userInfo = ["url": "shorttrack://\(alert.link)/\(alert.heatId)"]
         return UNNotificationRequest(identifier: alert.id, content: content, trigger: trigger)
     }
 
@@ -182,6 +235,7 @@ final class RaceAlerts {
     private enum Keys {
         static let handled = "alertsHandled"
         static let scheduled = "alertsScheduled"
+        static let picks = "picksAlerted"
     }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 /// and finals. Phone: the list, then a pick pushed on top. Wide: side by side.
 struct PicksTab: View {
     let split: Bool
+    @Environment(AppModel.self) private var model
     @State private var selected: Int?
     @State private var path: [Int] = []
 
@@ -24,12 +25,20 @@ struct PicksTab: View {
                 }
             }
             .navigationSplitViewStyle(.balanced)
+            .onChange(of: model.pickHeat, initial: true) { openFromAlert() }
         } else {
             NavigationStack(path: $path) {
                 PicksHomeView(split: false, selected: .constant(nil)) { path = [$0] }
                     .navigationDestination(for: Int.self) { PickView(heatId: $0).id($0) }
             }
+            .onChange(of: model.pickHeat, initial: true) { openFromAlert() }
         }
+    }
+
+    private func openFromAlert() {
+        guard let id = model.pickHeat else { return }
+        if split { selected = id } else { path = [id] }
+        model.pickHeat = nil
     }
 }
 

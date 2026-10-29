@@ -22,6 +22,7 @@ struct PickSummary: Decodable, Sendable, Hashable, Identifiable {
     let heatId: Int
     let title: String // "Women 1000 m"
     let race: String // "Semifinal · Heat 2", "Final A"
+    let round: String? // "Semifinals"
     let startsAt: Date?
     let state: String // scheduled | start_list | running | unofficial | official
     let picked: Bool
