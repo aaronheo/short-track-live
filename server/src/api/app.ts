@@ -219,18 +219,17 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     res.json({ nickname });
   }));
 
-  // Picks. Reading works signed out (no pick of your own); picking needs a session and a nickname.
+  // Picks are for signed-in people only; picking also needs a nickname. Signed
+  // out, GET /picks says so and nothing more.
   // PUT /picks/heats/:id { finish: [entry ids], penalized: [entry ids] }
   const picks = new Picks(db);
-  const optionalAccount = async (req: Request) => {
-    const token = sessionOf(req);
-    return token ? accounts.fromToken(token) : null;
-  };
   app.get('/picks', wrap(async (req, res) => {
-    res.json(await picks.home(await optionalAccount(req), now()));
+    const token = sessionOf(req);
+    const accountId = token ? await accounts.fromToken(token) : null;
+    res.json(await picks.home(accountId, now()));
   }));
-  app.get('/picks/heats/:id', wrap(async (req, res) => {
-    const view = await picks.heat(Number(req.params.id), await optionalAccount(req));
+  app.get('/picks/heats/:id', signedIn(async (req, res, accountId) => {
+    const view = await picks.heat(Number(req.params.id), accountId);
     if (!view) return res.status(404).json({ error: 'Picks are for quarterfinals, semifinals and finals.' });
     res.json(view);
   }));

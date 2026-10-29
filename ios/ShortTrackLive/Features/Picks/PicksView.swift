@@ -93,10 +93,18 @@ private struct PicksHomeView: View {
                 .foregroundStyle(Theme.muted)
                 .padding(.leading, 4)
         }
-        if !home.signedIn {
+        // Picks are for signed-in people only: signed out, there's nothing else here.
+        if !home.signedIn || !account.signedIn {
             SignInCard(title: "Make your picks", message: "Sign in with Google to guess the order of each race and see how you stack up.",
                        icon: "checklist", footnote: nil)
-        } else if let me = home.me {
+        } else {
+            signedInContent(home)
+        }
+    }
+
+    @ViewBuilder
+    private func signedInContent(_ home: PicksHome) -> some View {
+        if let me = home.me {
             scoreCard(me, players: home.players)
         }
         section("Pick now") {
@@ -230,7 +238,13 @@ struct PickView: View {
 
     var body: some View {
         Group {
-            if let heat {
+            if !account.signedIn {
+                ScrollView {
+                    SignInCard(title: "Sign in to pick", message: "Sign in with Google to guess the order of each race and see how you stack up.",
+                               icon: "checklist", footnote: nil)
+                        .padding(16)
+                }
+            } else if let heat {
                 if wide && heat.crowd != nil {
                     HStack(alignment: .top, spacing: 0) {
                         pickList(heat, crowdToo: false)
@@ -256,8 +270,8 @@ struct PickView: View {
                 Task { await save() }
             }
         }
-        .task(id: phase == .active) {
-            guard phase == .active else { return }
+        .task(id: "\(account.signedIn)-\(phase == .active)") {
+            guard phase == .active, account.signedIn else { return }
             while !Task.isCancelled {
                 await load()
                 // Every 15 s until the race is official.
@@ -468,7 +482,7 @@ struct PickView: View {
 
     @ViewBuilder
     private var bottomBar: some View {
-        if let heat, !heat.locked {
+        if let heat, !heat.locked, account.signedIn {
             VStack(spacing: 6) {
                 if let message { Text(message).font(.footnote).foregroundStyle(Theme.live) }
                 if account.signedIn {
@@ -484,9 +498,6 @@ struct PickView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(saving || heat.myPick == choice)
-                } else {
-                    SignInCard(title: "Sign in to pick", message: "Picks are saved to your account so they can be scored.",
-                               icon: "checklist", footnote: nil)
                 }
             }
             .padding(.horizontal, 16)

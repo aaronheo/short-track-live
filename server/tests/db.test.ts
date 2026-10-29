@@ -412,8 +412,9 @@ describe.skipIf(!url)('database + API', () => {
       const crowd = (await request(api()).get(`/picks/heats/${id}`).set('X-Session', a).expect(200)).body.crowd;
       expect(crowd.picks).toBe(2);
       expect(crowd.entries[0].places[0]).toBe(50);
-      // Signed out: no pick of your own, and no peeking before the race.
-      expect((await request(api()).get(`/picks/heats/${id}`).expect(200)).body).toMatchObject({ myPick: null, crowd: null });
+      // Signed out: nothing to see or pick.
+      await request(api()).get(`/picks/heats/${id}`).expect(401);
+      expect((await request(api()).get('/picks').expect(200)).body).toMatchObject({ signedIn: false, event: null, open: [], leaderboard: [] });
 
       const home = (await request(api()).get('/picks').set('X-Session', a).expect(200)).body;
       expect(home).toMatchObject({ signedIn: true, nickname: 'Ice Fan', event: { slug: WT1_2026 }, players: 2 });
@@ -438,7 +439,7 @@ describe.skipIf(!url)('database + API', () => {
       expect(home.leaderboard[0]).toMatchObject({ nickname: 'Ice Fan', points: entries.length * 3, me: true });
       // Not a pickable round.
       const heats = await heatOf('Heats', 'Heat 1', 'official');
-      await request(api()).get(`/picks/heats/${heats.id}`).expect(404);
+      await request(api()).get(`/picks/heats/${heats.id}`).set('X-Session', a).expect(404);
     });
   });
 

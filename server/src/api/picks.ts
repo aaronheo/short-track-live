@@ -90,7 +90,8 @@ export class Picks {
     const base: PicksHome = {
       signedIn: accountId != null, nickname, event: null, open: [], mine: [], me: null, players: 0, leaderboard: [],
     };
-    if (!event) return base;
+    // Picks are for signed-in people only.
+    if (!event || accountId == null) return base;
 
     const heats = (await this.db.query<HeatRow & { entries: number }>(
       `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
