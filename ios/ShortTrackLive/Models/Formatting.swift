@@ -37,6 +37,13 @@ enum Fmt {
         return "\(parts[0])/\(parts[1].suffix(2))"
     }
 
+    /// 1 → "1st", 2 → "2nd", 11 → "11th", 22 → "22nd".
+    static func ordinal(_ n: Int) -> String {
+        let teen = (11...13).contains(n % 100)
+        let suffix = teen ? "th" : [1: "st", 2: "nd", 3: "rd"][n % 10] ?? "th"
+        return "\(n)\(suffix)"
+    }
+
     /// "2026/2027" → "2026-2027" for the URL.
     static func seasonPath(_ title: String) -> String {
         title.replacingOccurrences(of: "/", with: "-")
