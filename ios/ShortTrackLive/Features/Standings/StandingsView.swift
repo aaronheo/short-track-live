@@ -20,7 +20,7 @@ struct StandingsTab: View {
                             StandingDetail(selection: selection, book: StandingsBook(response: data), inSheet: false).id(selection)
                         } else {
                             ContentUnavailableView("Pick a skater", systemImage: "trophy",
-                                                   description: Text("See their points and what the next World Tour stop could do."))
+                                                   description: Text("See their place, points and where they came from."))
                         }
                     }
                     .navigationDestination(for: Route.self) { route in StandingsDestination(route: route) }
@@ -192,7 +192,7 @@ private struct StandingsList: View {
 
     private func rule(_ list: StandingList) -> String {
         switch list.kind {
-        case "overall": "Points from the 500, 1000 and 1500 m at every World Tour event. Tap a skater for their points and what the next event could do."
+        case "overall": "Points from the 500, 1000 and 1500 m at every World Tour event. Tap a skater to see where their points came from."
         case "nations": "Every skater’s and relay team’s points for their country."
         default: "Points at each World Tour event: 100 for 1st, 80 for 2nd, 70 for 3rd."
         }
@@ -242,8 +242,7 @@ private struct StandingRow: View {
     }
 }
 
-/// One skater's standing: where they are, what the next stop could do, and
-/// where their points came from.
+/// One skater's standing: where they are and where their points came from.
 struct StandingDetail: View {
     let selection: StandingSelection
     let book: StandingsBook
@@ -259,9 +258,6 @@ struct StandingDetail: View {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 stats
-                if let next = book.nextEvent {
-                    scenarios(next)
-                }
                 earned
                 if let id = entry.skaterId {
                     NavigationLink(value: Route.athlete(id)) {
@@ -326,40 +322,6 @@ struct StandingDetail: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
-    }
-
-    private func scenarios(_ next: StandingEvent) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("If \(next.city ?? next.name) goes like this").sectionLabel().padding(.leading, 16)
-            VStack(spacing: 0) {
-                ForEach(Array(book.scenarios(for: entry, in: list).enumerated()), id: \.element) { index, s in
-                    if index > 0 { RowDivider(leading: 16) }
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(s.result).font(.callout.weight(.medium)).foregroundStyle(Theme.ink)
-                            Text("+\(s.gained) · \(s.total.formatted()) points").font(.footnote).foregroundStyle(Theme.muted)
-                        }
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Text(Fmt.ordinal(entry.rank)).foregroundStyle(Theme.muted)
-                            Image(systemName: "arrow.right").font(.caption.weight(.bold)).foregroundStyle(Theme.muted)
-                            Text(Fmt.ordinal(s.rank)).fontWeight(.semibold).foregroundStyle(s.rank < entry.rank ? Theme.positive : Theme.ink)
-                                .frame(minWidth: 36, alignment: .leading)
-                        }
-                        .font(.callout)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("From \(Fmt.ordinal(entry.rank)) to \(Fmt.ordinal(s.rank))")
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 56)
-                }
-            }
-            .card()
-            Text("One result in \(next.city ?? next.name), against today’s standings. Others score too.")
-                .font(.footnote)
-                .foregroundStyle(Theme.muted)
-                .padding(.horizontal, 16)
-        }
     }
 
     @ViewBuilder

@@ -77,7 +77,7 @@ There's no push from the server yet: that needs a paid Apple developer account (
 
 ISU's own World Tour standings, as isu-skating.com shows them: the Crystal Globe (overall) for women and men, each distance and relay, the mixed relay and nations. The sync worker reads them from ISU (`/events/get-world-standings-list`, then each list's skaters) every 6 hours, hourly around an event, and only fetches lists ISU has updated. They live in `standing` and `standing_entry`, with skaters linked by ISU's id and each column matched to that season's World Tour events in order. `GET /standings` serves the latest season; Ask can query them too.
 
-Tapping a skater shows their points by distance and stop, and what one result at the next stop would do against today's standings, using ISU's points per place (100, 80, 70, 60, 50, 44 …). On wide screens the list and the skater sit side by side.
+Tapping a skater shows their place, points and gap to 1st, and their points by distance and stop (ISU gives 100, 80, 70, 60, 50, 44 … per place). On wide screens the list and the skater sit side by side.
 
 ### Accounts (Sign in with Google)
 

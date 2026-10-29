@@ -54,9 +54,6 @@ struct StandingsBook: Sendable {
 
     var racedCount: Int { response.events.filter(\.raced).count }
 
-    /// The next World Tour stop still to race.
-    var nextEvent: StandingEvent? { response.events.first { !$0.raced } }
-
     /// The line under a name: each distance's place for the Crystal Globe
     /// ("500 m 2nd · 1000 m 6th · 1500 m 1st"); each stop's place for a distance.
     func meta(for entry: StandingEntry, in list: StandingList) -> String {
@@ -71,22 +68,6 @@ struct StandingsBook: Sendable {
             let place = response.pointsPerPlace.firstIndex(of: points).map { Fmt.ordinal($0 + 1) } ?? "\(points) pts"
             return "\(event.city ?? event.name) \(place)"
         }.joined(separator: " · ")
-    }
-
-    /// "What a result would do": one result at the next stop against today's standing.
-    func scenarios(for entry: StandingEntry, in list: StandingList) -> [Scenario] {
-        let points = response.pointsPerPlace
-        guard points.count >= 5 else { return [] }
-        // Places, not finals: how many skate an A final differs by distance.
-        let options: [(String, Int)] = [
-            ("Wins a distance", points[0]), ("2nd in a distance", points[1]),
-            ("3rd in a distance", points[2]), ("5th in a distance", points[4]),
-        ]
-        return options.map { label, gained in
-            let total = entry.points + gained
-            let ahead = list.entries.filter { !$0.matches(entry) && $0.points > total }.count
-            return Scenario(result: label, gained: gained, total: total, rank: ahead + 1)
-        }
     }
 
     /// Points so far, one row per distance and stop.
@@ -104,13 +85,6 @@ struct StandingsBook: Sendable {
 
     private func distanceLists(gender: String) -> [StandingList] {
         response.lists.filter { $0.gender == gender && $0.kind == "distance" && ["500", "1000", "1500"].contains($0.distance ?? "") }
-    }
-
-    struct Scenario: Hashable, Sendable {
-        let result: String
-        let gained: Int
-        let total: Int
-        let rank: Int
     }
 
     struct Earned: Hashable, Sendable {

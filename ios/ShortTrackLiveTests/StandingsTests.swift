@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ShortTrackLive
 
-/// The Standings screens' lines and "what a result would do", from a trimmed
+/// The Standings screens' lines and points, from a trimmed
 /// copy of the women's standings after World Tour #1.
 struct StandingsTests {
     let book: StandingsBook = {
@@ -37,7 +37,6 @@ struct StandingsTests {
     @Test func chipsAreTheCategorysListsThenTheMixedOnes() {
         #expect(book.lists(for: "Women").map(\.title) == ["Crystal Globe", "500 m", "1000 m", "1500 m", "Mixed relay"])
         #expect(book.lists(for: "Men").map(\.title) == ["Mixed relay"])
-        #expect(book.nextEvent?.city == "Montreal")
         #expect(book.racedCount == 1)
     }
 
@@ -45,14 +44,6 @@ struct StandingsTests {
         #expect(book.meta(for: overall.entries[0], in: overall) == "500 2nd · 1000 6th · 1500 1st")
         let w500 = book.response.lists[1]
         #expect(book.meta(for: w500.entries[0], in: w500) == "Vancouver 1st")
-    }
-
-    @Test func whatOneResultWouldDo() {
-        let s = book.scenarios(for: kim, in: overall)
-        #expect(s.map(\.result) == ["Wins a distance", "2nd in a distance", "3rd in a distance", "5th in a distance"])
-        #expect(s.map(\.total) == [190, 170, 160, 140])
-        // 190 passes Choi (188) and Velzeboer (180); the others only reach 4th in this trimmed list.
-        #expect(s.map(\.rank) == [2, 4, 4, 4])
     }
 
     @Test func pointsSoFarByDistance() {
