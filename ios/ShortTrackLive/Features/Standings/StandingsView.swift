@@ -156,15 +156,23 @@ private struct StandingsList: View {
                 let leader = list.entries.first?.points ?? 0
                 ForEach(Array(list.entries.enumerated()), id: \.element.id) { index, entry in
                     if index > 0 { RowDivider(leading: 58) }
+                    let selected = split && selection?.entry == entry && selection?.list == list
                     let row = StandingRow(entry: entry, meta: book.meta(for: entry, in: list), compact: split,
                                           favorite: entry.skaterId.map(favorites.contains) ?? false,
-                                          gap: index == 0 ? (list.kind == "overall" ? "Leader" : nil) : "−\((leader - entry.points).formatted())",
-                                          selected: split && selection?.entry == entry && selection?.list == list)
-                    if entry.skaterId != nil {
-                        Button { selection = StandingSelection(entry: entry, list: list) } label: { row }
-                            .buttonStyle(RowButtonStyle())
-                    } else {
-                        row
+                                          gap: index == 0 ? (list.kind == "overall" ? "Leader" : nil) : "−\((leader - entry.points).formatted())")
+                    // A plain rectangle behind the row (not a modifier on the button, which
+                    // iOS clips to rounded corners), so the highlight runs edge to edge.
+                    ZStack {
+                        Rectangle().fill(selected ? Theme.link.opacity(0.12) : entry.rank == 1 ? Theme.link.opacity(0.04) : .clear)
+                        if entry.skaterId != nil {
+                            Button { selection = StandingSelection(entry: entry, list: list) } label: { row }
+                                .buttonStyle(RowButtonStyle())
+                                .focusEffectDisabled()
+                                .hoverEffectDisabled()
+                                .accessibilityAddTraits(selected ? .isSelected : [])
+                        } else {
+                            row
+                        }
                     }
                 }
             }
@@ -206,7 +214,6 @@ private struct StandingRow: View {
     var compact = false
     let favorite: Bool
     let gap: String?
-    let selected: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -236,7 +243,6 @@ private struct StandingRow: View {
         .padding(.trailing, compact ? 12 : 16)
         .padding(.vertical, compact ? 4 : 8)
         .frame(minHeight: compact ? 48 : 60)
-        .background(selected ? Theme.link.opacity(0.1) : entry.rank == 1 ? Theme.link.opacity(0.04) : .clear)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
