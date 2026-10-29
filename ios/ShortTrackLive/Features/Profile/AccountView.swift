@@ -1,31 +1,37 @@
 import SwiftUI
 
-/// Top of Profile, signed out: sign in with Google to keep favorites.
+/// Signed out: sign in with Google. Top of Profile (to keep favorites) and of Picks.
 struct SignInCard: View {
     @Environment(AccountStore.self) private var account
+    var title = "Keep your favorites"
+    var message = "Sign in with Google to save your favorite skaters and settings, and get them back on any iPhone or iPad."
+    var icon = "checkmark.icloud"
+    var footnote: String? = "Without an account, everything stays on this iPhone."
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "checkmark.icloud")
+                Image(systemName: icon)
                     .font(.title3.weight(.medium))
                     .foregroundStyle(Theme.link)
                     .frame(width: 40, height: 40)
                     .background(Theme.link.opacity(0.1), in: .circle)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Keep your favorites").font(.headline).foregroundStyle(Theme.ink)
-                    Text("Sign in with Google to save your favorite skaters and settings, and get them back on any iPhone or iPad.")
+                    Text(title).font(.headline).foregroundStyle(Theme.ink)
+                    Text(message)
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             GoogleButton()
-            Text("Without an account, everything stays on this iPhone.")
-                .font(.footnote)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity)
+            if let footnote {
+                Text(footnote)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .padding(EdgeInsets(top: 20, leading: 16, bottom: 16, trailing: 16))
         .card()
@@ -102,6 +108,7 @@ struct AccountView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
     @State private var confirmSignOut = false
+    @State private var editingNickname = false
     @State private var confirmDelete = false
     @State private var failed: String?
 
@@ -120,6 +127,20 @@ struct AccountView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     VStack(spacing: 0) {
+                        Button { editingNickname = true } label: {
+                            HStack(spacing: 12) {
+                                Text("Nickname").foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text(account.account?.nickname ?? "Choose one").foregroundStyle(account.account?.nickname == nil ? Theme.link : Theme.muted)
+                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.faint)
+                            }
+                            .font(.callout)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 48)
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        RowDivider(leading: 16)
                         row("Name", account.account?.name ?? "–")
                         RowDivider(leading: 16)
                         row("Email", account.account?.email ?? "–")
@@ -155,6 +176,7 @@ struct AccountView: View {
         .background(Theme.ground)
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $editingNickname) { NicknameSheet() }
         .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign out") { Task { await account.signOut(); dismiss() } }
         } message: {

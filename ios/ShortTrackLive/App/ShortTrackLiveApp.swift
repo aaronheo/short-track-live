@@ -23,7 +23,7 @@ struct ShortTrackLiveApp: App {
     }
 }
 
-/// Tabs: Events, Standings, Profile, and Search (iOS's search tab, which sits apart).
+/// Tabs: Events, Standings, Picks, Profile, and Search (iOS's search tab, which sits apart).
 /// Wide windows (iPad, Duo unfolded: about 626 pt portrait, 890 landscape)
 /// get sidebar layouts; phones get one stack per tab.
 struct RootView: View {
@@ -43,6 +43,9 @@ struct RootView: View {
             }
             Tab("Standings", systemImage: "trophy", value: AppTab.standings) {
                 StandingsTab(split: split)
+            }
+            Tab("Picks", systemImage: "checklist", value: AppTab.picks) {
+                PicksTab(split: split)
             }
             Tab("Profile", systemImage: "person.crop.circle", value: AppTab.profile) {
                 ProfileView()

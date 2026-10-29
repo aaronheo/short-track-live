@@ -65,7 +65,7 @@ cd ios && xcodegen generate && open ShortTrackLive.xcodeproj
 
 The app talks to `http://localhost:4310` by default (`ios/Config/App.xcconfig`). To use the deployed server, create `ios/Config/Secrets.xcconfig` as described above; launch arguments `-APIBaseURL` and `-APIToken` override both. Deep links for testing: `shorttrack://event/<slug>`, `shorttrack://round/<id>`, `shorttrack://heat/<id>`, `shorttrack://athlete/<id>`.
 
-Tabs: Events, Standings, Profile, and Search, where a name finds athletes and a question goes to Ask.
+Tabs: Events, Standings, Picks, Profile, and Search, where a name finds athletes and a question goes to Ask.
 
 ### Favorites and notifications
 
@@ -78,6 +78,12 @@ There's no push from the server yet: that needs a paid Apple developer account (
 ISU's own World Tour standings, as isu-skating.com shows them: the Crystal Globe (overall) for women and men, each distance and relay, the mixed relay and nations. The sync worker reads them from ISU (`/events/get-world-standings-list`, then each list's skaters) every 6 hours, hourly around an event, and only fetches lists ISU has updated. They live in `standing` and `standing_entry`, with skaters linked by ISU's id and each column matched to that season's World Tour events in order. `GET /standings` serves the latest season; Ask can query them too.
 
 Tapping a skater shows their place, points and gap to 1st, and their points by distance and stop (ISU gives 100, 80, 70, 60, 50, 44 … per place). On wide screens the list and the skater sit side by side.
+
+### Picks
+
+Before each quarterfinal, semifinal and final, signed-in people put the skaters in the order they think they'll finish, starting from the start order, and can mark any as penalized. Picks lock when the race starts (the heat stops being a start list). After picking, or once the race starts, everyone's picks show per skater: the most picked place or penalty, with a bar for each. When the result is official a pick scores 3 for an exact place, 1 for one place off and 3 for a penalty (or card) called right; scores are worked out when read, so a corrected result rescores. The Picks tab shows the live (or next) event's open races, your picks and the leaderboard. Leaderboards use a nickname, chosen at the first pick and changeable in Account; the race chat will use it too.
+
+API: `GET /picks`, `GET /picks/heats/:id`, `PUT /picks/heats/:id { finish, penalized }` (entry ids), `PUT /me/nickname`. Stored in `pick` and `account.nickname`.
 
 ### Accounts (Sign in with Google)
 

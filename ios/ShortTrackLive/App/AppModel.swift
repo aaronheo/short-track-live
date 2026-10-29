@@ -9,7 +9,7 @@ enum Route: Hashable {
 }
 
 enum AppTab: Hashable {
-    case events, standings, profile, search
+    case events, standings, picks, profile, search
 }
 
 /// Navigation state for both layouts. On a phone everything is one stack

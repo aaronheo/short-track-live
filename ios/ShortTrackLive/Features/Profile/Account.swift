@@ -6,6 +6,8 @@ struct AccountInfo: Codable, Equatable, Sendable {
     let name: String?
     let email: String?
     let provider: String
+    /// The name on leaderboards (and in chat).
+    var nickname: String?
 }
 
 struct AccountSettings: Codable, Equatable, Sendable {
@@ -110,6 +112,18 @@ final class AccountStore {
             _ = try? await api.send("POST", "/auth/signout", account: session, as: Empty.self)
         }
         forget()
+    }
+
+    /// The session token for signed-in requests (Picks).
+    var session: String? { account == nil ? nil : Keychain.session }
+
+    /// Sets the leaderboard name. Throws APIError.refused with the server's reason (taken, not allowed).
+    func setNickname(_ name: String) async throws {
+        guard let session = Keychain.session else { throw APIError.signedOut }
+        struct Reply: Decodable { let nickname: String }
+        if let reply = try await api.send("PUT", "/me/nickname", body: ["nickname": name], account: session, as: Reply.self) {
+            account?.nickname = reply.nickname
+        }
     }
 
     /// Deletes the account and what's saved in it; this iPhone keeps its copy.

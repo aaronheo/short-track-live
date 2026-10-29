@@ -22,10 +22,13 @@ enum APIError: LocalizedError {
     case status(Int)
     /// The account session is gone (signed out or deleted on another device).
     case signedOut
+    /// The server said no, with a reason to show ("Someone already has that name.").
+    case refused(Int, String, needsNickname: Bool)
 
     var errorDescription: String? {
         switch self {
         case .signedOut: "You were signed out. Sign in again."
+        case .refused(_, let message, _): message
         case .status(401): "The server rejected the app's token (API_TOKEN in ios/Config/Secrets.xcconfig)"
         case .status(404): "Not found"
         case .status(let code): "Server error (\(code))"
@@ -94,14 +97,17 @@ actor APIClient {
             return nil
         case 200:
             return try JSONDecoder.api.decode(T.self, from: data)
-        case 401 where (try? JSONDecoder().decode(SignedOutReply.self, from: data))?.signedOut == true:
+        case 401 where (try? JSONDecoder().decode(ErrorReply.self, from: data))?.signedOut == true:
             throw APIError.signedOut
+        case let code where (400..<500).contains(code):
+            guard let reply = try? JSONDecoder().decode(ErrorReply.self, from: data), let message = reply.error else { throw APIError.status(code) }
+            throw APIError.refused(code, message, needsNickname: reply.needsNickname ?? false)
         case let code:
             throw APIError.status(code)
         }
     }
 
-    private struct SignedOutReply: Decodable { let signedOut: Bool? }
+    private struct ErrorReply: Decodable { let error: String?; let signedOut: Bool?; let needsNickname: Bool? }
 
     /// Forget the ETag so the next call returns a value (a screen that was
     /// recreated has nothing to fall back on).
