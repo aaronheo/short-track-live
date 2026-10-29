@@ -54,22 +54,6 @@ struct StandingsBook: Sendable {
 
     var racedCount: Int { response.events.filter(\.raced).count }
 
-    /// The line under a name: each distance's place for the Crystal Globe
-    /// ("500 m 2nd · 1000 m 6th · 1500 m 1st"); each stop's place for a distance.
-    func meta(for entry: StandingEntry, in list: StandingList) -> String {
-        if list.kind == "overall" {
-            return distanceLists(gender: list.gender).compactMap { other in
-                // "500 2nd": the distance without "m", so all three fit on a phone.
-                other.entries.first { $0.matches(entry) }.map { "\(other.distance ?? other.title) \(Fmt.ordinal($0.rank))" }
-            }.joined(separator: " · ")
-        }
-        return zip(response.events, entry.perEvent).compactMap { event, points -> String? in
-            guard let points else { return nil }
-            let place = response.pointsPerPlace.firstIndex(of: points).map { Fmt.ordinal($0 + 1) } ?? "\(points) pts"
-            return "\(event.city ?? event.name) \(place)"
-        }.joined(separator: " · ")
-    }
-
     /// Points so far, one row per distance and stop.
     func pointsSoFar(for entry: StandingEntry, gender: String) -> [Earned] {
         distanceLists(gender: gender).flatMap { list -> [Earned] in

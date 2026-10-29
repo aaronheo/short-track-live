@@ -157,7 +157,7 @@ private struct StandingsList: View {
                 ForEach(Array(list.entries.enumerated()), id: \.element.id) { index, entry in
                     if index > 0 { RowDivider(leading: 58) }
                     let selected = split && selection?.entry == entry && selection?.list == list
-                    let row = StandingRow(entry: entry, meta: book.meta(for: entry, in: list), compact: split,
+                    let row = StandingRow(entry: entry, compact: split,
                                           favorite: entry.skaterId.map(favorites.contains) ?? false,
                                           gap: index == 0 ? (list.kind == "overall" ? "Leader" : nil) : "−\((leader - entry.points).formatted())")
                     // A plain rectangle behind the row (not a modifier on the button, which
@@ -209,7 +209,6 @@ private struct StandingsList: View {
 
 private struct StandingRow: View {
     let entry: StandingEntry
-    let meta: String
     /// Sidebar rows (wide layouts) are a step smaller, per the wide layout kit.
     var compact = false
     let favorite: Bool
@@ -228,9 +227,6 @@ private struct StandingRow: View {
                     if favorite {
                         Image(systemName: "star.fill").font(.caption2).foregroundStyle(Theme.star).accessibilityLabel("Favorite")
                     }
-                }
-                if !meta.isEmpty {
-                    Text(meta).font(compact ? .caption : .footnote).foregroundStyle(Theme.muted).lineLimit(1)
                 }
             }
             Spacer(minLength: 8)
