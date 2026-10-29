@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
-  EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSeason,
+  EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSeason, IsuStandingEntry, IsuStandingList,
 } from './types.js';
 
 const BASE = 'https://front-api.isu.org';
@@ -80,6 +80,25 @@ export class IsuClient {
       'POST', `/events/get-event-result-round-heats-stk-${team ? 'team' : 'single'}`,
       { form: { event_result_id: eventResultId, event_result_round_id: roundId, country_code: '' } },
       cached)) ?? [];
+  }
+
+  /** ISU's published standings for one season (`seasonId` is ISU's, our season.isu_id). */
+  async standingLists(seasonId: number): Promise<IsuStandingList[]> {
+    return (await this.call<IsuStandingList[] | null>('POST', '/events/get-world-standings-list', {
+      json: { page: 1, discipline_id: SHORT_TRACK, season_id: seasonId, pagesize: 100 },
+    }, false)) ?? [];
+  }
+
+  /** Everyone in one standing, best first. Relays and nations are teams. */
+  async standing(id: number, team: boolean): Promise<IsuStandingEntry[]> {
+    const out: IsuStandingEntry[] = [];
+    for (let page = 1; ; page++) {
+      const res = await this.request('POST', `/events/get-world-standings-stk-ssk-detail-skater-${team ? 'team' : 'single'}`, {
+        json: { page, pagesize: 200, world_standings_list_fsk_id: id },
+      }, false);
+      out.push(...((res.data as IsuStandingEntry[] | null) ?? []));
+      if (res.is_next_page !== 'Y') return out;
+    }
   }
 
   /** Everything for one event. Use `cached` for finished events. */

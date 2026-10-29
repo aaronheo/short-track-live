@@ -5,10 +5,11 @@ import { distanceLabel, medal, raceCodes, roundLabel, shortEventName, shownTime 
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { parseRule } from '../src/domain/rules.js';
+import { WORLD_TOUR_POINTS, classifyStanding, standingEventCity, titleCaseName } from '../src/domain/standings.js';
 import { summarize } from '../src/domain/summary.js';
 import { isConnectionError } from '../src/sync/worker.js';
 import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
-import { WORLDS, WT1_2026, placeHeats, round, tree } from './fixtures.js';
+import { WORLDS, WT1_2026, placeHeats, round, standings2026, tree } from './fixtures.js';
 
 describe('time', () => {
   it('turns ISU heat dates (local time with a fake Z) into real UTC', () => {
@@ -294,5 +295,32 @@ describe('favorite alerts', () => {
     expect(list(['A', 'B', 'C'])).toBe('A, B and C');
     expect(medalNote([{ place: 1, distanceM: 1500 }, { place: 1, distanceM: 500 }, { place: 1, distanceM: 1000 }])).toBe('Gold 500, 1000 and 1500 m');
     expect(medalNote([{ place: 2, distanceM: 500 }, { place: 1, distanceM: 1500 }])).toBe('Gold 1500 m, silver 500 m');
+  });
+});
+
+describe('standings', () => {
+  const fixture = standings2026();
+
+  it('keeps the World Tour classifications and leaves out the World Ranking', () => {
+    const kept = fixture.list.data.map((l) => [l.name.trim(), classifyStanding(l)] as const).filter(([, info]) => info);
+    expect(kept.map(([, info]) => `${info!.kind} ${info!.gender} ${info!.distance ?? ''}`.trim())).toEqual([
+      'overall Men', 'overall Women', 'nations Mixed',
+      'distance Men 500', 'distance Men 1000', 'distance Men 1500', 'distance Men relay',
+      'distance Women 500', 'distance Women 1000', 'distance Women 1500', 'distance Women relay', 'distance Mixed mixed',
+    ]);
+    expect(fixture.list.data.filter((l) => l.type.startsWith('WR')).every((l) => classifyStanding(l) === null)).toBe(true);
+  });
+
+  it('knows the points for each place at one stop', () => {
+    // After one event a distance ranking is that event's places.
+    const women1000 = fixture.details['4268']!.data.filter((e, i, all) => all.findIndex((x) => x.rank === e.rank) === i);
+    for (const e of women1000) expect(e.points).toBe(WORLD_TOUR_POINTS[e.rank - 1]);
+  });
+
+  it('reads city and name from ISU', () => {
+    expect(standingEventCity('ISU Short Track World Tour 2026/27 - Vancouver (CAN)')).toBe('Vancouver');
+    expect(standingEventCity('')).toBeNull();
+    expect(titleCaseName('SANTOS-GRISWOLD')).toBe('Santos-Griswold');
+    expect(titleCaseName("VAN 'T WOUT")).toBe("Van 't Wout");
   });
 });

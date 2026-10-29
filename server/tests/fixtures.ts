@@ -31,3 +31,9 @@ export function placeHeats(rnd: EventTree['competitions'][number]['rounds'][numb
     })),
   }));
 }
+
+/** ISU's 2026/27 World Tour standings after World Tour #1: the list and each list's entries (by id). */
+export const standings2026 = () => JSON.parse(readFileSync(path.join(DATA, 'standings-2026-2027.json'), 'utf8')) as {
+  list: { data: import('../src/isu/types.js').IsuStandingList[] };
+  details: Record<string, { data: import('../src/isu/types.js').IsuStandingEntry[] }>;
+};

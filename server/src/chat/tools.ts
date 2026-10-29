@@ -30,6 +30,8 @@ const SCHEMA = `Tables (Postgres):
 - relay_team(id, name, nation); relay_member(entry_id, skater_id)  -- skaters in a relay entry
 - lap(entry_id, lap_no, lap_ms, position)
 - nation(code, name, iso2)  -- IOC codes: CAN, KOR, NED
+- standing(id, season_id, kind ['overall','distance','nations'], gender ['Men','Women','Mixed'], distance ['500','1000','1500','relay','mixed' or null], name, events jsonb)  -- ISU World Tour standings; overall = Crystal Globe
+- standing_entry(standing_id, rank, points, skater_id, nation, name, per_event int[])  -- skater_id null for relay teams and nations
 Conventions: an A final is heat.name in ('Final', 'Final A'); medals are ranks 1-3 in an A final. Times: time_ms (number) and time_text ('40.064', '1:24.537').`;
 
 export const TOOL_DEFINITIONS = [

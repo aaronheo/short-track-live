@@ -4,6 +4,7 @@ import { competitionName, roundName } from '../domain/normalize.js';
 import { isuLocalDate } from '../domain/time.js';
 import { isRelay, type IsuClient } from '../isu/client.js';
 import type { IsuEvent } from '../isu/types.js';
+import { StandingsSync } from './standings.js';
 
 // Polling policy. ISU only ever gets one request at a time from us (IsuClient
 // queues them, at most one per second).
@@ -20,11 +21,15 @@ const HISTORY_FROM = '2019/2020';
 const SKIP_EVENTS = new Set([4096]);
 const FINISH_CHECK_EVERY = 6 * 60 * 60_000; // a just-finished event, fetched whole and fresh
 const PULLED_RECENTLY = 12 * 60 * 60_000; // a finished event still settling isn't fetched again sooner
+const STANDINGS_EVERY = 6 * 60 * 60_000; // ISU's World Tour standings (only changed lists are fetched)
+const LIVE_STANDINGS_EVERY = 60 * 60_000; // ...hourly around an event: ISU recalculates after each day of racing
 
 type Log = (msg: string) => void;
 
 export class SyncWorker {
   private readonly ingest: Ingest;
+  private readonly standings: StandingsSync;
+  private lastStandings = 0;
   private lastStructure = new Map<number, number>();
   private lastHeats = new Map<number, number>();
   private lastEventList = 0;
@@ -37,6 +42,7 @@ export class SyncWorker {
     private readonly log: Log = (m) => console.log(`[sync] ${m}`),
   ) {
     this.ingest = new Ingest(pool);
+    this.standings = new StandingsSync(isu, pool, log);
   }
 
   /** The current season's title per ISU, plus the one before it. */
@@ -179,6 +185,12 @@ export class SyncWorker {
         this.lastFinishCheck.set(ev.id, now);
         await this.finishEvent(ev);
       }
+    }
+
+    // After the live polling, so a standings hiccup never holds up results.
+    if (now - this.lastStandings >= (live.length ? LIVE_STANDINGS_EVERY : STANDINGS_EVERY)) {
+      this.lastStandings = now;
+      await this.standings.refresh().catch((err) => this.log(`standings failed: ${(err as Error).message}`));
     }
   }
 

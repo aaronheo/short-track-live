@@ -129,3 +129,34 @@ export interface EventTree {
   schedule: IsuScheduleItem[];
   competitions: (IsuCompetition & { rounds: (IsuRound & { heats: IsuHeat[] })[] })[];
 }
+
+/** One of ISU's published standings (World Tour classifications and World Rankings). */
+export interface IsuStandingList {
+  world_standings_list_fsk_id: number;
+  season_id: number; // ISU's, our season.isu_id
+  name: string; // "Overall World Tour Classification Women"
+  gender: string; // "Men" | "Women" | "Mixed"
+  discipline_name: string; // "Women 500 m", "Men Relay 5000 m", "Mixed Relay 2000 m"; "" for overall
+  type: string; // WCO overall, WCT nations, WCD by distance; WRO/WRD World Ranking
+  team_type: string; // "Singles" | "Couples" (relays, nations)
+  calculation_date: string | null;
+  updated_at: string;
+}
+
+export interface IsuStandingEntry {
+  rank: number; // ties share a rank
+  rank_index: number; // order
+  points: number;
+  nf_for_country_code: string | null;
+  skaters_type: string; // "Single" | "Team"
+  skaters?: { api_id: string | null; first_name: string | null; last_name: string; nationality_code: string | null } | null;
+  skaters_team?: { api_id: string | null; name: string; nf_organization_code: string | null } | null;
+  /** One per World Tour stop, in order; `result` is "" where nothing was scored (yet). */
+  world_standings_list_stk_competitors_competition_points: {
+    country: string; // "CAN1", "KOR"
+    display_order: number;
+    result: string;
+    date: string | null;
+    name: string; // "ISU Short Track World Tour 2026/27 - Vancouver (CAN)" once raced
+  }[];
+}

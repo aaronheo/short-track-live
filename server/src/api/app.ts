@@ -8,6 +8,7 @@ import { Accounts, cleanSettings, parseFavorites, type VerifyGoogle } from './ac
 import { Athletes, type RaceFilters } from './athletes.js';
 import { Favorites } from './favorites.js';
 import { Repo } from './repo.js';
+import { Standings } from './standings.js';
 import { dayOfEvent, eventSummary, heatView, onTheIce, roundView, scheduleView, type EventsResponse } from './views.js';
 
 export interface AppOptions {
@@ -156,6 +157,12 @@ export function createApp(db: Db, opts: AppOptions = {}) {
 
   app.get('/favorites/suggested', wrap(async (_req, res) => {
     res.json(await favorites.suggested());
+  }));
+
+  // ISU's World Tour standings. ?season=2026-2027; the latest season with standings by default.
+  const standings = new Standings(db);
+  app.get('/standings', wrap(async (req, res) => {
+    res.json(await standings.season(text(req.query.season)?.replace('-', '/') ?? null));
   }));
 
   // Accounts. POST /auth/google { idToken } signs in and returns a session

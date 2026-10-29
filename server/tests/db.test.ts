@@ -11,7 +11,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/api/app.js';
 import { createPool } from '../src/db/pool.js';
 import { Ingest } from '../src/db/ingest.js';
-import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, tree } from './fixtures.js';
+import { StandingsSync } from '../src/sync/standings.js';
+import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, standings2026, tree } from './fixtures.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const MIGRATIONS = path.resolve(import.meta.dirname, '../../supabase/migrations');
@@ -260,6 +261,47 @@ describe.skipIf(!url)('database + API', () => {
     expect(body.event).toBe('World Championships');
     expect(body.skaters.length).toBeGreaterThanOrEqual(9);
     for (const s of body.skaters) expect(s.note).toMatch(/^(Gold|Silver|Bronze) \d/);
+  });
+
+  describe('standings', () => {
+    const fixture = standings2026();
+    const source = {
+      calls: 0,
+      async standingLists() { return fixture.list.data; },
+      async standing(id: number) { this.calls++; return fixture.details[String(id)]?.data ?? []; },
+    };
+
+    it('loads ISU\'s World Tour standings once, and again only when ISU updates them', async () => {
+      const sync = new StandingsSync(source, pool, () => {});
+      expect(await sync.refresh()).toBe(12);
+      expect(await sync.refresh()).toBe(0);
+      expect(source.calls).toBe(12);
+    });
+
+    it('GET /standings has every list with skaters linked to their results', async () => {
+      const { body } = await request(app).get('/standings').expect(200);
+      expect(body.season).toBe('2026/2027');
+      expect(body.events.map((e: { code: string }) => e.code)).toEqual(['CAN1', 'CAN2', 'KOR', 'CHN1', 'CHN2', 'POL', 'NED']);
+      expect(body.events[0]).toMatchObject({ name: 'World Tour #1', city: 'Vancouver', slug: WT1_2026, raced: true });
+      expect(body.events[1].raced).toBe(false);
+      expect(body.pointsPerPlace.slice(0, 3)).toEqual([100, 80, 70]);
+      type L = { gender: string; kind: string; distance: string | null; title: string; entries: { rank: number; points: number; skaterId: number | null; name: string; last: string; nat: string; iso2: string; perEvent: (number | null)[] }[] };
+      const lists = body.lists as L[];
+      expect(lists.map((l) => `${l.gender} ${l.title}`)).toEqual([
+        'Women Crystal Globe', 'Women 500 m', 'Women 1000 m', 'Women 1500 m', 'Women Relay',
+        'Men Crystal Globe', 'Men 500 m', 'Men 1000 m', 'Men 1500 m', 'Men Relay',
+        'Mixed Mixed relay', 'Mixed Nations',
+      ]);
+      const leader = lists[0]!.entries[0]!;
+      expect(leader).toMatchObject({ rank: 1, points: 224, name: 'Courtney Sarault', last: 'Sarault', nat: 'CAN', iso2: 'CA' });
+      expect(leader.skaterId).toEqual(expect.any(Number));
+      expect(leader.perEvent).toEqual([224, null, null, null, null, null, null]);
+      const relay = lists.find((l) => l.gender === 'Women' && l.distance === 'relay')!;
+      expect(relay.entries[0]).toMatchObject({ rank: 1, points: 100, skaterId: null, name: 'Canada', last: 'Canada', nat: 'CAN' });
+      expect(lists.at(-1)!.entries[0]).toMatchObject({ nat: 'KOR', points: 1496, skaterId: null });
+      // Every skater in the women's Crystal Globe raced in Vancouver, so all are linked.
+      expect(lists[0]!.entries.every((e) => e.skaterId != null)).toBe(true);
+    });
   });
 
   describe('accounts', () => {
