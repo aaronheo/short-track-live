@@ -288,18 +288,9 @@ struct StandingDetail: View {
     private var header: some View {
         HStack(spacing: 14) {
             FlagView(iso2: entry.iso2, nat: entry.nat, size: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name).font(.title2.weight(.bold)).foregroundStyle(Theme.ink)
-                Text([Fmt.country(iso2: entry.iso2, fallback: entry.nat), standingName].compactMap { $0 }.joined(separator: " · "))
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-            }
+            Text(entry.name).font(.title2.weight(.bold)).foregroundStyle(Theme.ink)
         }
         .padding(.top, 8)
-    }
-
-    private var standingName: String {
-        list.kind == "overall" ? "Crystal Globe, \(list.gender.lowercased())" : "\(list.gender) \(list.title)"
     }
 
     private var stats: some View {
