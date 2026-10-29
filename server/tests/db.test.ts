@@ -3,14 +3,18 @@
 // and recreates the public schema), e.g.
 //   TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54329/shorttrack_test npm test
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import type pg from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/api/app.js';
 import { createPool } from '../src/db/pool.js';
 import { Ingest } from '../src/db/ingest.js';
+import { IsuClient } from '../src/isu/client.js';
+import { IsuRecorder } from '../src/isu/recorder.js';
 import { StandingsSync } from '../src/sync/standings.js';
 import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, standings2025, standings2026, tree } from './fixtures.js';
 
@@ -505,5 +509,32 @@ describe.skipIf(!url)('database + API', () => {
     await request(app).get(`/events/${WORLDS}/schedule`).expect(404);
     const { body } = await request(app).get('/seasons/2025-2026/events').expect(200);
     expect(JSON.stringify(body)).not.toContain(WORLDS);
+  });
+
+  it('records ISU responses while recording is on, only when they change', async () => {
+    let answer: unknown = [{ id: 1, status: 'Live' }];
+    const fetchImpl = (async () => new Response(JSON.stringify({ status: 200, data: answer }))) as typeof fetch;
+    const cacheDir = mkdtempSync(path.join(os.tmpdir(), 'isu-'));
+    const isu = new IsuClient({ minIntervalMs: 0, cacheDir, fetchImpl, recorder: new IsuRecorder(pool) });
+    const rows = async () => (await pool.query<{ path: string; body: string; data: Buffer }>(
+      'select path, body, data from isu_recording order by id')).rows;
+
+    await isu.rounds(7);
+    expect(await rows()).toEqual([]);
+    isu.recording = true;
+    await isu.rounds(7);
+    await isu.rounds(7);
+    answer = [{ id: 1, status: 'Finished' }];
+    await isu.rounds(7);
+    // A new process (fresh recorder) doesn't repeat what's stored.
+    const next = new IsuClient({ minIntervalMs: 0, cacheDir, fetchImpl, recorder: new IsuRecorder(pool) });
+    next.recording = true;
+    await next.rounds(7);
+    const saved = await rows();
+    expect(saved.map((r) => [r.path, r.body])).toEqual([
+      ['/events/get-event-result-round', '{"event_result_id":"7"}'],
+      ['/events/get-event-result-round', '{"event_result_id":"7"}'],
+    ]);
+    expect(JSON.parse(gunzipSync(saved[1]!.data).toString()).data).toEqual([{ id: 1, status: 'Finished' }]);
   });
 });

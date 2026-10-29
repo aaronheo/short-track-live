@@ -156,11 +156,16 @@ export class SyncWorker {
 
   async tick(now: number): Promise<void> {
     const live = await this.liveEvents(now);
+    // ISU's answers about live events are recorded (IsuRecorder): the event
+    // list and the live polling, not the settling events' pulls or standings.
+    this.isu.recording = false;
     const listEvery = live.length ? LIVE_EVENT_LIST_EVERY : EVENT_LIST_EVERY;
     if (now - this.lastEventList >= listEvery) {
       this.lastEventList = now;
       const { current } = await this.seasons();
+      this.isu.recording = live.length > 0;
       const events = await this.isu.events(current);
+      this.isu.recording = false;
       for (const ev of events) await this.ingest.upsertEvent(ev);
       this.log(`refreshed ${current} event list`);
       // Finished events that haven't settled, fetched again for ISU's corrections.
@@ -169,6 +174,7 @@ export class SyncWorker {
       }
     }
 
+    this.isu.recording = true;
     for (const ev of live) {
       if (now - (this.lastStructure.get(ev.id) ?? 0) >= STRUCTURE_EVERY) {
         this.lastStructure.set(ev.id, now);
@@ -186,6 +192,7 @@ export class SyncWorker {
         await this.finishEvent(ev);
       }
     }
+    this.isu.recording = false;
 
     // After the live polling, so a standings hiccup never holds up results.
     if (now - this.lastStandings >= (live.length ? LIVE_STANDINGS_EVERY : STANDINGS_EVERY)) {

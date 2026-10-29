@@ -2,6 +2,7 @@ import 'dotenv/config';
 import path from 'node:path';
 import { createPool } from '../db/pool.js';
 import { IsuClient } from '../isu/client.js';
+import { IsuRecorder } from '../isu/recorder.js';
 import { SyncWorker } from './worker.js';
 
 /**
@@ -12,7 +13,11 @@ import { SyncWorker } from './worker.js';
  */
 export async function startSync(opts: { backfillOnly?: boolean; allHistory?: boolean } = {}) {
   const pool = createPool();
-  const isu = new IsuClient({ cacheDir: path.resolve(process.env.ISU_CACHE_DIR ?? '.cache/isu') });
+  // Live events' ISU responses go to isu_recording unless ISU_RECORD=0.
+  const isu = new IsuClient({
+    cacheDir: path.resolve(process.env.ISU_CACHE_DIR ?? '.cache/isu'),
+    recorder: process.env.ISU_RECORD === '0' ? undefined : new IsuRecorder(pool),
+  });
   const worker = new SyncWorker(isu, pool);
   const { current, previous } = await worker.seasons();
   if (opts.allHistory) {

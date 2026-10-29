@@ -32,6 +32,8 @@ Apply the files in `supabase/migrations/` to the database once, in order, then:
 
 The server sends ISU at most one request per second and keeps every raw response in `server/.cache/`.
 
+While an event is live, the sync worker also records what ISU answers, with when, in `isu_recording` (migration 0009): the event list and the live polling, gzipped, and only when a response differs from the last one for the same request. It's for playing a live weekend back later to test the live features. `ISU_RECORD=0` turns it off.
+
 ### Ask
 
 Questions typed into Search ("How did Sarault do at the Olympics?") go to `POST /chat`, which answers with OpenAI from our database. The model looks things up with a few tools (athlete search, an athlete's races, event finals, a heat) and, for anything else, one read-only `SELECT` run as the `chat_reader` role (migration 0003) with a 5 s timeout. Answers stream back as server-sent events. Nothing is stored: the app sends the conversation with each question and OpenAI is called with `store: false`.

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { IsuResponse } from './recorder.js';
 import type {
   EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSeason, IsuStandingEntry, IsuStandingList,
 } from './types.js';
@@ -17,6 +18,8 @@ export interface ClientOptions {
   cacheDir?: string;
   fetchImpl?: typeof fetch;
   retries?: number;
+  /** Gets each response fetched from ISU while `recording` is on (see IsuRecorder). */
+  recorder?: { save(r: IsuResponse): Promise<void> };
 }
 
 /**
@@ -29,15 +32,19 @@ export class IsuClient {
   private readonly cacheDir: string;
   private readonly fetchImpl: typeof fetch;
   private readonly retries: number;
+  private readonly recorder?: ClientOptions['recorder'];
   private queue: Promise<unknown> = Promise.resolve();
   private last = 0;
   requests = 0;
+  /** Set by the sync worker while it polls a live event. */
+  recording = false;
 
   constructor(opts: ClientOptions = {}) {
     this.minIntervalMs = opts.minIntervalMs ?? 1000;
     this.cacheDir = opts.cacheDir ?? path.resolve('.cache/isu');
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.retries = opts.retries ?? 3;
+    this.recorder = opts.recorder;
   }
 
   seasons() {
@@ -161,6 +168,7 @@ export class IsuClient {
         if (json.status !== 200) throw new Error(`${method} ${apiPath} -> ${json.status} ${json.message ?? ''}`);
         await mkdir(this.cacheDir, { recursive: true });
         await writeFile(file, JSON.stringify(json));
+        if (this.recording) await this.recorder?.save({ key, method, path: apiPath, body: payload, json });
         return json;
       } catch (err) {
         const retryable = err instanceof RetryableError || err instanceof TypeError; // TypeError = network
