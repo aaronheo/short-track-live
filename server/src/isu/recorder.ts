@@ -23,7 +23,9 @@ export class IsuRecorder {
   async save(r: IsuResponse): Promise<void> {
     try {
       const text = JSON.stringify(r.json);
-      const hash = createHash('sha1').update(text).digest('hex');
+      // ISU's message flips between "... fetched successfully" and "... (cache)"; not a change.
+      const { message: _, ...rest } = r.json as { message?: string };
+      const hash = createHash('sha1').update(JSON.stringify(rest)).digest('hex');
       let prev = this.last.get(r.key);
       if (prev === undefined) {
         const res = await this.pool.query<{ hash: string }>(

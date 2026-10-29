@@ -513,7 +513,11 @@ describe.skipIf(!url)('database + API', () => {
 
   it('records ISU responses while recording is on, only when they change', async () => {
     let answer: unknown = [{ id: 1, status: 'Live' }];
-    const fetchImpl = (async () => new Response(JSON.stringify({ status: 200, data: answer }))) as typeof fetch;
+    let calls = 0;
+    // ISU's message changes from one request to the next; that alone isn't recorded.
+    const fetchImpl = (async () => new Response(JSON.stringify({
+      status: 200, message: `fetched successfully${++calls % 2 ? ' (cache)' : ''}`, data: answer,
+    }))) as typeof fetch;
     const cacheDir = mkdtempSync(path.join(os.tmpdir(), 'isu-'));
     const isu = new IsuClient({ minIntervalMs: 0, cacheDir, fetchImpl, recorder: new IsuRecorder(pool) });
     const rows = async () => (await pool.query<{ path: string; body: string; data: Buffer }>(
