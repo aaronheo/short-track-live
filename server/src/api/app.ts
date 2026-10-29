@@ -161,10 +161,16 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     res.json(await favorites.suggested());
   }));
 
-  // ISU's World Tour standings. ?season=2026-2027; the latest season with standings by default.
+  // ISU's standings: /standings is the latest season with standings,
+  // /standings/2025-2026 (or ?season=2025-2026) a past one.
   const standings = new Standings(db);
   app.get('/standings', wrap(async (req, res) => {
     res.json(await standings.season(text(req.query.season)?.replace('-', '/') ?? null));
+  }));
+  app.get('/standings/:season', wrap(async (req, res) => {
+    const body = await standings.season(String(req.params.season).replace('-', '/'));
+    if (!body.lists.length) return res.status(404).json({ error: 'No standings for that season' });
+    res.json(body);
   }));
 
   // Accounts. POST /auth/google { idToken } signs in and returns a session

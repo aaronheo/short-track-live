@@ -1,16 +1,29 @@
 import SwiftUI
 
-/// The Standings tab: ISU's World Tour standings. On a phone a skater opens in
-/// a sheet; on wide screens (Duo unfolded, iPad) the list sits beside them.
+/// The Standings tab: ISU's standings, this season's or a past one's. On a
+/// phone a skater opens in a sheet; on wide screens (Duo unfolded, iPad) the
+/// list sits beside them.
 struct StandingsTab: View {
     let split: Bool
-    @State private var live = Live<StandingsResponse>("standings") { _ in .seconds(300) }
+    /// nil = the latest season.
+    @State private var season: String?
+    @State private var live = StandingsTab.load(season: nil)
     @State private var selection: StandingSelection?
+
+    private static func load(season: String?) -> Live<StandingsResponse> {
+        Live(season.map { "standings/\(Fmt.seasonPath($0))" } ?? "standings") { _ in .seconds(300) }
+    }
+
+    private func pick(_ picked: String) {
+        season = picked == live.value?.seasons?.first ? nil : picked
+        live = Self.load(season: season)
+        selection = nil
+    }
 
     var body: some View {
         if split {
             NavigationSplitView(columnVisibility: .constant(.all)) {
-                StandingsList(live: live, selection: $selection, split: true)
+                StandingsList(live: live, selection: $selection, split: true, pick: pick)
                     .toolbar(removing: .sidebarToggle) // the sidebar stays open
                     .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 420)
             } detail: {
@@ -29,7 +42,7 @@ struct StandingsTab: View {
             .navigationSplitViewStyle(.balanced)
         } else {
             NavigationStack {
-                StandingsList(live: live, selection: $selection, split: false)
+                StandingsList(live: live, selection: $selection, split: false, pick: pick)
                     .navigationDestination(for: Route.self) { route in StandingsDestination(route: route) }
             }
             .sheet(item: $selection) { selection in
@@ -69,9 +82,12 @@ private struct StandingsList: View {
     let live: Live<StandingsResponse>
     @Binding var selection: StandingSelection?
     let split: Bool
+    /// Switches season.
+    let pick: (String) -> Void
     @Environment(Favorites.self) private var favorites
     @AppStorage("standingsGender") private var gender = "Women"
-    @State private var chosen: [String: Int] = [:] // list id picked per category
+    /// The list picked per category, by key ("overall", "500"), so it stays picked in another season.
+    @State private var chosen: [String: String] = [:]
 
     var body: some View {
         LiveContent(live: live) { data in
@@ -79,9 +95,9 @@ private struct StandingsList: View {
             let lists = book.lists(for: gender)
             if lists.isEmpty {
                 ContentUnavailableView("No standings yet", systemImage: "trophy",
-                                       description: Text("ISU publishes the World Tour standings after the first event of the season."))
+                                       description: Text("ISU publishes the standings after the first event of the season."))
             } else {
-                let list = lists.first { $0.id == chosen[gender] } ?? lists[0]
+                let list = lists.first { $0.key == chosen[gender] } ?? lists[0]
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         Picker("Category", selection: $gender.animation(.snappy)) {
@@ -104,13 +120,33 @@ private struct StandingsList: View {
         .navigationTitle("Standings")
         .navigationBarTitleDisplayMode(split ? .inline : .large)
         .toolbar {
-            if let season = live.value?.season {
+            if let data = live.value, let season = data.season {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Text(Fmt.season(season)).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.muted)
+                    if let seasons = data.seasons, seasons.count > 1 {
+                        seasonMenu(season, seasons: seasons)
+                    } else {
+                        Text(Fmt.season(season)).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.muted)
+                    }
                 }
             }
         }
-        .task { await live.run() }
+        .task(id: ObjectIdentifier(live)) { await live.run() }
+    }
+
+    /// The same season menu as Events.
+    private func seasonMenu(_ season: String, seasons: [String]) -> some View {
+        Menu {
+            Picker("Season", selection: Binding(get: { season }, set: pick)) {
+                ForEach(seasons, id: \.self) { Text(Fmt.season($0)).tag($0) }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(Fmt.season(season)).font(.subheadline.weight(.semibold))
+                Image(systemName: "chevron.down").font(.caption.weight(.bold))
+            }
+            .foregroundStyle(Theme.ink)
+        }
+        .accessibilityLabel("Season \(Fmt.season(season)). Change season")
     }
 
     private func chips(_ lists: [StandingList], current: StandingList) -> some View {
@@ -119,7 +155,7 @@ private struct StandingsList: View {
                 ForEach(lists) { list in
                     let on = list.id == current.id
                     Button {
-                        withAnimation(.snappy) { chosen[gender] = list.id }
+                        withAnimation(.snappy) { chosen[gender] = list.key }
                     } label: {
                         Text(list.title)
                             .font(.subheadline.weight(.semibold))
@@ -179,16 +215,14 @@ private struct StandingsList: View {
             .card()
             .clipShape(.rect(cornerRadius: 16))
             .padding(.horizontal, 16)
-            Text(rule(list))
+            Text(rule(list, book: book))
                 .font(.footnote)
                 .foregroundStyle(Theme.muted)
                 .padding(.horizontal, 32)
         }
     }
 
-    private func progress(_ book: StandingsBook) -> String {
-        "After \(book.racedCount) of \(book.response.events.count) events"
-    }
+    private func progress(_ book: StandingsBook) -> String { book.progress }
 
     private func heading(_ list: StandingList) -> String {
         switch list.kind {
@@ -198,11 +232,14 @@ private struct StandingsList: View {
         }
     }
 
-    private func rule(_ list: StandingList) -> String {
+    private func rule(_ list: StandingList, book: StandingsBook) -> String {
+        let series = book.series
         switch list.kind {
-        case "overall": "Points from the 500, 1000 and 1500 m at every World Tour event. Tap a skater to see where their points came from."
-        case "nations": "Every skater’s and relay team’s points for their country."
-        default: "Points at each World Tour event: 100 for 1st, 80 for 2nd, 70 for 3rd."
+        case "overall": return "Points from the 500, 1000 and 1500 m at every \(series) event. Tap a skater to see where their points came from."
+        case "nations": return "Every skater’s and relay team’s points for their country."
+        default:
+            guard let points = book.response.pointsPerPlace, points.count >= 3 else { return "Points from every \(series) event." }
+            return "Points at each \(series) event: \(points[0]) for 1st, \(points[1]) for 2nd, \(points[2]) for 3rd."
         }
     }
 }
@@ -324,7 +361,7 @@ struct StandingDetail: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Points so far").sectionLabel().padding(.leading, 16)
                 VStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+                    ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                         if index > 0 { RowDivider(leading: 16) }
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {

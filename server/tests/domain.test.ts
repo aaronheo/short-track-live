@@ -6,7 +6,7 @@ import { competitionName, genderName, heatName, heatState, normalizeEntries, rou
 import { placesCard } from '../src/domain/places.js';
 import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/picks.js';
 import { parseRule } from '../src/domain/rules.js';
-import { WORLD_TOUR_POINTS, classifyStanding, standingEventCity, titleCaseName } from '../src/domain/standings.js';
+import { WORLD_TOUR_POINTS, classifyStanding, genderOfSkaters, standingEventCity, standingPoints, titleCaseName } from '../src/domain/standings.js';
 import { summarize } from '../src/domain/summary.js';
 import { isConnectionError } from '../src/sync/worker.js';
 import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
@@ -312,10 +312,24 @@ describe('standings', () => {
     expect(fixture.list.data.filter((l) => l.type.startsWith('WR')).every((l) => classifyStanding(l) === null)).toBe(true);
   });
 
+  it('reads past seasons\' lists: no gender field, junior lists left out', () => {
+    const list = (type: string, name: string, discipline = '', gender = '') => ({ type, name, discipline_name: discipline, gender });
+    expect(classifyStanding(list('WCD', 'World Cup Classification by discipline Men 500 m', 'Men 500 m')))
+      .toEqual({ kind: 'distance', gender: 'Men', distance: '500' });
+    expect(classifyStanding(list('WCD', 'World Cup Classification by discipline Mixed Relay 2000 m', 'Mixed Relay 2000 m')))
+      .toEqual({ kind: 'distance', gender: 'Mixed', distance: 'mixed' });
+    // An overall list that doesn't say whose: its skaters do.
+    expect(classifyStanding(list('WCO', 'Overall World Cup Classification'))).toEqual({ kind: 'overall', gender: null, distance: null });
+    expect(genderOfSkaters(['F', 'F', 'M', null])).toBe('Women');
+    expect(genderOfSkaters([])).toBeNull();
+    expect(classifyStanding(list('WCD', 'Junior World Cup Classification by discipline Men 500 m', 'Men 500 m', 'Men'))).toBeNull();
+    expect([standingPoints('100'), standingPoints('(60)'), standingPoints(''), standingPoints(undefined)]).toEqual([100, null, null, null]);
+  });
+
   it('knows the points for each place at one stop', () => {
     // After one event a distance ranking is that event's places.
     const women1000 = fixture.details['4268']!.data.filter((e, i, all) => all.findIndex((x) => x.rank === e.rank) === i);
-    for (const e of women1000) expect(e.points).toBe(WORLD_TOUR_POINTS[e.rank - 1]);
+    for (const e of women1000) expect(e.points).toBe(WORLD_TOUR_POINTS[e.rank! - 1]);
   });
 
   it('reads city and name from ISU', () => {

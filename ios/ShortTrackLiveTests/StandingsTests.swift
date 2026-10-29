@@ -38,6 +38,7 @@ struct StandingsTests {
         #expect(book.lists(for: "Women").map(\.title) == ["Crystal Globe", "500 m", "1000 m", "1500 m", "Mixed relay"])
         #expect(book.lists(for: "Men").map(\.title) == ["Mixed relay"])
         #expect(book.racedCount == 1)
+        #expect(book.progress == "After 1 of 2 events")
     }
 
     @Test func pointsSoFarByDistance() {
@@ -48,5 +49,24 @@ struct StandingsTests {
 
     @Test func ordinals() {
         #expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(Fmt.ordinal) == ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "101st"])
+    }
+
+    /// A World Cup season: no points table, and a stop that raced the 500 m twice.
+    @Test func pastSeasonWithADistanceRacedTwice() throws {
+        let json = """
+        {"season":"2023/2024","seasons":["2026/2027","2023/2024"],"series":"World Cup","pointsPerPlace":null,
+         "events":[{"code":"CAN","name":"World Cup #1","city":"Montréal","slug":"wc1","raced":true},
+                   {"code":"CHN","name":"World Cup #3","city":"Beijing","slug":"wc3","raced":true}],
+         "lists":[{"id":354,"kind":"distance","gender":"Women","distance":"500","title":"500 m","eventIndex":[0,1,1],"entries":[
+            {"rank":1,"points":350,"skaterId":5,"name":"Xandra Velzeboer","last":"Velzeboer","nat":"NED","iso2":"NL","perEvent":[100,null,150]}]}]}
+        """
+        let past = StandingsBook(response: try JSONDecoder.api.decode(StandingsResponse.self, from: Data(json.utf8)))
+        let list = past.response.lists[0]
+        let rows = past.pointsSoFar(for: list.entries[0], gender: "Women")
+        #expect(rows.map { "\($0.event) \($0.place ?? "-") \($0.points)" } == ["World Cup #1, Montréal - 100", "World Cup #3, Beijing - 150"])
+        #expect(past.progress == "Final · 2 events")
+        #expect(past.series == "World Cup")
+        #expect(list.key == "500")
+        #expect(overall.key == "overall")
     }
 }

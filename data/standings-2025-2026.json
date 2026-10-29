@@ -1,0 +1,960 @@
+{
+ "list": {
+  "data": [
+   {
+    "world_standings_list_fsk_id": 599,
+    "season_id": 1,
+    "discipline_id": 3,
+    "identifier": "2025_STK_WCO__Men_Senior",
+    "name": "Overall World Tour Classification Men",
+    "ranking_type_name": "World Cup Classification",
+    "season_name": "2025/2026",
+    "season_from_year": 2025,
+    "discipline_name": "",
+    "level_name": "Senior",
+    "gender": "Men",
+    "discipline_distance": "",
+    "type": "WCO",
+    "calculation_date": "2025-12-01T11:03:20.000Z",
+    "display_order": 1,
+    "created_at": "2026-08-25T14:30:27.000Z",
+    "updated_at": "2026-08-25T14:30:27.000Z",
+    "team_type": "Singles"
+   },
+   {
+    "world_standings_list_fsk_id": 606,
+    "season_id": 1,
+    "discipline_id": 3,
+    "identifier": "2025_STK_WCD_500_Women_Senior",
+    "name": "World Tour Classification by discipline Women 500 m",
+    "ranking_type_name": "World Cup Classification",
+    "season_name": "2025/2026",
+    "season_from_year": 2025,
+    "discipline_name": "Women 500 m",
+    "level_name": "Senior",
+    "gender": "Women",
+    "discipline_distance": "500",
+    "type": "WCD",
+    "calculation_date": "2025-12-01T11:03:09.000Z",
+    "display_order": 8,
+    "created_at": "2026-08-25T14:30:39.000Z",
+    "updated_at": "2026-08-25T14:30:39.000Z",
+    "team_type": "Singles"
+   },
+   {
+    "world_standings_list_fsk_id": 609,
+    "season_id": 1,
+    "discipline_id": 3,
+    "identifier": "2025_STK_WCD_3000_Women_Senior",
+    "name": "World Tour Classification by discipline Women Relay 3000 m",
+    "ranking_type_name": "World Cup Classification",
+    "season_name": "2025/2026",
+    "season_from_year": 2025,
+    "discipline_name": "Women Relay 3000 m",
+    "level_name": "Senior",
+    "gender": "Women",
+    "discipline_distance": "3000",
+    "type": "WCD",
+    "calculation_date": "2025-12-01T11:03:12.000Z",
+    "display_order": 11,
+    "created_at": "2026-08-25T14:30:44.000Z",
+    "updated_at": "2026-08-25T14:30:44.000Z",
+    "team_type": "Couples"
+   },
+   {
+    "world_standings_list_fsk_id": 620,
+    "season_id": 1,
+    "discipline_id": 3,
+    "identifier": "2025_STK_WCD_500_Men_Junior",
+    "name": "Junior World Cup Classification by discipline Men 500 m",
+    "ranking_type_name": "World Cup Classification",
+    "season_name": "2025/2026",
+    "season_from_year": 2025,
+    "discipline_name": "Men 500 m",
+    "level_name": "Junior",
+    "gender": "Men",
+    "discipline_distance": "500",
+    "type": "WCD",
+    "calculation_date": "2025-11-19T14:34:09.000Z",
+    "display_order": 22,
+    "created_at": "2026-08-25T14:31:04.000Z",
+    "updated_at": "2026-08-25T14:31:04.000Z",
+    "team_type": "Singles"
+   },
+   {
+    "world_standings_list_fsk_id": 611,
+    "season_id": 1,
+    "discipline_id": 3,
+    "identifier": "2025_STK_WRD_500_Men_Senior",
+    "name": "World Ranking Men 500 m",
+    "ranking_type_name": "World Ranking",
+    "season_name": "2025/2026",
+    "season_from_year": 2025,
+    "discipline_name": "Men 500 m",
+    "level_name": "Senior",
+    "gender": "Men",
+    "discipline_distance": "500",
+    "type": "WRD",
+    "calculation_date": "2025-12-01T11:03:14.000Z",
+    "display_order": 13,
+    "created_at": "2026-08-25T14:30:47.000Z",
+    "updated_at": "2026-08-25T14:30:47.000Z",
+    "team_type": "Singles"
+   }
+  ]
+ },
+ "details": {
+  "599": {
+   "data": [
+    {
+     "world_standings_list_fsk_competitors_id": 44731,
+     "world_standings_list_fsk_id": 599,
+     "skaters_id": 1422,
+     "skaters_team_id": null,
+     "api_id": "31c704b5-deb3-4a36-b352-6bc38b6ef668",
+     "nf_for_country_code": "CAN",
+     "points": 824,
+     "rank": 1,
+     "rank_index": 1,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:27.000Z",
+     "skaters": {
+      "id": 1422,
+      "discipline_id": 3,
+      "api_id": "31c704b5-deb3-4a36-b352-6bc38b6ef668",
+      "organization_code": "CAN",
+      "gender": "M",
+      "nationality_code": "CAN",
+      "image": "uploads/default/user-placeholder_skaters.png",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2024-2025/Skater-Portraits/william-dandjinou.jpg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/bbad079cd3bd35ce018efba1cb813749bed4a9e90663c59b94b35a6b26344e67.png",
+      "slug": "william-dandjinou",
+      "first_name": "William",
+      "last_name": "DANDJINOU",
+      "full_name": "William DANDJINOU"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44731,
+       "world_standings_list_stk_competitors_competition_points_id": "25895",
+       "result": "100",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Montreal (CAN)",
+       "country": "CAN1",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44731,
+       "world_standings_list_stk_competitors_competition_points_id": "25896",
+       "result": "300",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2024/25 - Montreal (CAN)",
+       "country": "CAN2",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44731,
+       "world_standings_list_stk_competitors_competition_points_id": "25897",
+       "result": "200",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Gdansk (POL)",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44731,
+       "world_standings_list_stk_competitors_competition_points_id": "25898",
+       "result": "224",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Dordrecht (NED)",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 44732,
+     "world_standings_list_fsk_id": 599,
+     "skaters_id": 6451,
+     "skaters_team_id": null,
+     "api_id": "bd65b259-09a6-403b-ae60-1a77258c9704",
+     "nf_for_country_code": "ITA",
+     "points": 604,
+     "rank": 2,
+     "rank_index": 2,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:27.000Z",
+     "skaters": {
+      "id": 6451,
+      "discipline_id": 3,
+      "api_id": "bd65b259-09a6-403b-ae60-1a77258c9704",
+      "organization_code": "ITA",
+      "gender": "M",
+      "nationality_code": "ITA",
+      "image": "uploads/default/user-placeholder_skaters.png",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/pietro-sighel.jpg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/0392f4ab4f54299fc73186d26bfed65884e72fb34a9a30b6c350258adeda4cc8.png",
+      "slug": "pietro-sighel",
+      "first_name": "Pietro",
+      "last_name": "Sighel",
+      "full_name": "Pietro Sighel"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44732,
+       "world_standings_list_stk_competitors_competition_points_id": "25899",
+       "result": "180",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Montreal (CAN)",
+       "country": "CAN1",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44732,
+       "world_standings_list_stk_competitors_competition_points_id": "25900",
+       "result": "154",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2024/25 - Montreal (CAN)",
+       "country": "CAN2",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44732,
+       "world_standings_list_stk_competitors_competition_points_id": "25901",
+       "result": "150",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Gdansk (POL)",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44732,
+       "world_standings_list_stk_competitors_competition_points_id": "25902",
+       "result": "120",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Dordrecht (NED)",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 44733,
+     "world_standings_list_fsk_id": 599,
+     "skaters_id": 1701,
+     "skaters_team_id": null,
+     "api_id": "0508a236-47d3-48e1-9de9-3168455e3f67",
+     "nf_for_country_code": "CAN",
+     "points": 542,
+     "rank": 3,
+     "rank_index": 3,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:27.000Z",
+     "skaters": {
+      "id": 1701,
+      "discipline_id": 3,
+      "api_id": "0508a236-47d3-48e1-9de9-3168455e3f67",
+      "organization_code": "CAN",
+      "gender": "M",
+      "nationality_code": "CAN",
+      "image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/GettyImages-2261824734-1771626367-3182.jpg",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/4-DUBOIS-Steven-CAN-0440-1771626367-8222.jpg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/825d6c1d1c5f452fd43823fddf63e1fcbd4d43dac241f711abc223fda324532c.jpg",
+      "slug": "steven-dubois",
+      "first_name": "Steven",
+      "last_name": "DUBOIS",
+      "full_name": "Steven DUBOIS"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44733,
+       "world_standings_list_stk_competitors_competition_points_id": "25903",
+       "result": "114",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Montreal (CAN)",
+       "country": "CAN1",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44733,
+       "world_standings_list_stk_competitors_competition_points_id": "25904",
+       "result": "150",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2024/25 - Montreal (CAN)",
+       "country": "CAN2",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44733,
+       "world_standings_list_stk_competitors_competition_points_id": "25905",
+       "result": "184",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Gdansk (POL)",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44733,
+       "world_standings_list_stk_competitors_competition_points_id": "25906",
+       "result": "94",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Dordrecht (NED)",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 44734,
+     "world_standings_list_fsk_id": 599,
+     "skaters_id": 6784,
+     "skaters_team_id": null,
+     "api_id": "0693e2ed-927c-4952-bb13-41f1cea38885",
+     "nf_for_country_code": "CHN",
+     "points": 454,
+     "rank": 4,
+     "rank_index": 4,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:27.000Z",
+     "skaters": {
+      "id": 6784,
+      "discipline_id": 3,
+      "api_id": "0693e2ed-927c-4952-bb13-41f1cea38885",
+      "organization_code": "CHN",
+      "gender": "M",
+      "nationality_code": "CHN",
+      "image": "uploads/default/user-placeholder_skaters.png",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2024-2025/Skater-Portraits/long-sun.jpg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/48ca8472f03999c522a6a96e1a20b575564651c49d24dddc0f2d23348218acf9.jpg",
+      "slug": "long-sun",
+      "first_name": "Long",
+      "last_name": "SUN",
+      "full_name": "Long SUN"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44734,
+       "world_standings_list_stk_competitors_competition_points_id": "25907",
+       "result": "170",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Montreal (CAN)",
+       "country": "CAN1",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44734,
+       "world_standings_list_stk_competitors_competition_points_id": "25908",
+       "result": "106",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2024/25 - Montreal (CAN)",
+       "country": "CAN2",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44734,
+       "world_standings_list_stk_competitors_competition_points_id": "25909",
+       "result": "72",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Gdansk (POL)",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44734,
+       "world_standings_list_stk_competitors_competition_points_id": "25910",
+       "result": "106",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "ISU Short Track World Tour 2025/26 - Dordrecht (NED)",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:28.000Z"
+      }
+     ]
+    }
+   ]
+  },
+  "606": {
+   "data": [
+    {
+     "world_standings_list_fsk_competitors_id": 44991,
+     "world_standings_list_fsk_id": 606,
+     "skaters_id": 7447,
+     "skaters_team_id": null,
+     "api_id": "b22265f4-511c-470b-a901-36be2a855c2b",
+     "nf_for_country_code": "NED",
+     "points": 300,
+     "rank": 1,
+     "rank_index": 1,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:39.000Z",
+     "skaters": {
+      "id": 7447,
+      "discipline_id": 3,
+      "api_id": "b22265f4-511c-470b-a901-36be2a855c2b",
+      "organization_code": "NED",
+      "gender": "F",
+      "nationality_code": "NED",
+      "image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/GettyImages-2261923824-1771248363-7097.jpg",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/xandra-velzeboer.jpg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/8faaa77e5b93cff181857bd9b2b89272202b397a295bfc3a89636de85399df83.png",
+      "slug": "xandra-velzeboer",
+      "first_name": "Xandra",
+      "last_name": "VELZEBOER",
+      "full_name": "Xandra VELZEBOER"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44991,
+       "world_standings_list_stk_competitors_competition_points_id": "26935",
+       "result": "100",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44991,
+       "world_standings_list_stk_competitors_competition_points_id": "26936",
+       "result": "100",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44991,
+       "world_standings_list_stk_competitors_competition_points_id": "26937",
+       "result": "100",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44991,
+       "world_standings_list_stk_competitors_competition_points_id": "26938",
+       "result": "60",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 44992,
+     "world_standings_list_fsk_id": 606,
+     "skaters_id": 6159,
+     "skaters_team_id": null,
+     "api_id": "3d729e21-9a1c-4be6-b39d-289a51cc7495",
+     "nf_for_country_code": "CAN",
+     "points": 240,
+     "rank": 2,
+     "rank_index": 2,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:39.000Z",
+     "skaters": {
+      "id": 6159,
+      "discipline_id": 3,
+      "api_id": "3d729e21-9a1c-4be6-b39d-289a51cc7495",
+      "organization_code": "CAN",
+      "gender": "F",
+      "nationality_code": "CAN",
+      "image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/GettyImages-2261305046-1770974851-0305.jpg",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/courtney-sarault.jpg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/30cfd1b8beae59edf6692b3f08faf58812203c69a829ab344f556386ec3a11cd.jpg",
+      "slug": "courtney-sarault",
+      "first_name": "Courtney",
+      "last_name": "SARAULT",
+      "full_name": "Courtney SARAULT"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44992,
+       "world_standings_list_stk_competitors_competition_points_id": "26939",
+       "result": "50",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44992,
+       "world_standings_list_stk_competitors_competition_points_id": "26940",
+       "result": "80",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44992,
+       "world_standings_list_stk_competitors_competition_points_id": "26941",
+       "result": "60",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44992,
+       "world_standings_list_stk_competitors_competition_points_id": "26942",
+       "result": "100",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 44993,
+     "world_standings_list_fsk_id": 606,
+     "skaters_id": 6716,
+     "skaters_team_id": null,
+     "api_id": "b511e70d-c2e9-41b4-9cb5-5cc4e2cf5db2",
+     "nf_for_country_code": "USA",
+     "points": 230,
+     "rank": 3,
+     "rank_index": 3,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:39.000Z",
+     "skaters": {
+      "id": 6716,
+      "discipline_id": 3,
+      "api_id": "b511e70d-c2e9-41b4-9cb5-5cc4e2cf5db2",
+      "organization_code": "USA",
+      "gender": "F",
+      "nationality_code": "USA",
+      "image": "uploads/default/user-placeholder_skaters.png",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2025-2026/Skater-Portraits/image0-1764686433-3219.jpeg",
+      "featured_image": "uploads/isunewrevamp/skaters/original/7c6dff9c55b730be137aa2a7022d18526ff552190063b92e92c06eacbc979d3f.png",
+      "slug": "corinne-stoddard",
+      "first_name": "Corinne",
+      "last_name": "Stoddard",
+      "full_name": "Corinne Stoddard"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44993,
+       "world_standings_list_stk_competitors_competition_points_id": "26943",
+       "result": "70",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44993,
+       "world_standings_list_stk_competitors_competition_points_id": "26944",
+       "result": "60",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44993,
+       "world_standings_list_stk_competitors_competition_points_id": "26945",
+       "result": "80",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44993,
+       "world_standings_list_stk_competitors_competition_points_id": "26946",
+       "result": "80",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 44994,
+     "world_standings_list_fsk_id": 606,
+     "skaters_id": 6152,
+     "skaters_team_id": null,
+     "api_id": "59c1749c-7f07-4109-98db-d8611a0df4f8",
+     "nf_for_country_code": "USA",
+     "points": 154,
+     "rank": 4,
+     "rank_index": 4,
+     "skaters_type": "Single",
+     "created_at": "2026-08-25T14:30:39.000Z",
+     "skaters": {
+      "id": 6152,
+      "discipline_id": 3,
+      "api_id": "59c1749c-7f07-4109-98db-d8611a0df4f8",
+      "organization_code": "USA",
+      "gender": "F",
+      "nationality_code": "USA",
+      "image": "uploads/default/user-placeholder_skaters.png",
+      "thumbnail_image": "CMS/Fansite/Short-Track/2024-2025/Skater-Portraits/kristen-santos-griswold.jpg",
+      "featured_image": null,
+      "slug": "kristen-santos-griswold",
+      "first_name": "Kristen",
+      "last_name": "SANTOS-GRISWOLD",
+      "full_name": "Kristen SANTOS-GRISWOLD"
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 44994,
+       "world_standings_list_stk_competitors_competition_points_id": "26947",
+       "result": "44",
+       "date": "2025-10-12T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44994,
+       "world_standings_list_stk_competitors_competition_points_id": "26948",
+       "result": "70",
+       "date": "2025-10-19T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44994,
+       "world_standings_list_stk_competitors_competition_points_id": "26949",
+       "result": "40",
+       "date": "2025-11-23T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 44994,
+       "world_standings_list_stk_competitors_competition_points_id": "26950",
+       "result": "10",
+       "date": "2025-11-30T00:00:00.000Z",
+       "name": "Women 500 m",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:40.000Z"
+      }
+     ]
+    }
+   ]
+  },
+  "609": {
+   "data": [
+    {
+     "world_standings_list_fsk_competitors_id": 45088,
+     "world_standings_list_fsk_id": 609,
+     "skaters_id": null,
+     "skaters_team_id": 11530,
+     "api_id": "2787a5b5-1012-4545-a9b6-89e0f860bfb8",
+     "nf_for_country_code": "NED",
+     "points": 280,
+     "rank": 1,
+     "rank_index": 1,
+     "skaters_type": "Team",
+     "created_at": "2026-08-25T14:30:44.000Z",
+     "skaters_team": {
+      "id": 11530,
+      "discipline_id": null,
+      "api_id": "2787a5b5-1012-4545-a9b6-89e0f860bfb8",
+      "nf_organization_code": "NED",
+      "gender": null,
+      "image": null,
+      "thumbnail_image": null,
+      "featured_image": null,
+      "slug": "netherlands-525",
+      "members": [],
+      "name": "Netherlands",
+      "couple_name": "",
+      "short_name": ""
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 45088,
+       "world_standings_list_stk_competitors_competition_points_id": "27323",
+       "result": "80",
+       "date": "2025-10-11T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45088,
+       "world_standings_list_stk_competitors_competition_points_id": "27324",
+       "result": "(60)",
+       "date": "2025-10-18T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45088,
+       "world_standings_list_stk_competitors_competition_points_id": "27325",
+       "result": "100",
+       "date": "2025-11-22T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45088,
+       "world_standings_list_stk_competitors_competition_points_id": "27326",
+       "result": "100",
+       "date": "2025-11-29T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 45089,
+     "world_standings_list_fsk_id": 609,
+     "skaters_id": null,
+     "skaters_team_id": 11529,
+     "api_id": "b00f15a5-b6c8-4bdb-bc39-09693e943147",
+     "nf_for_country_code": "KOR",
+     "points": 240,
+     "rank": 2,
+     "rank_index": 2,
+     "skaters_type": "Team",
+     "created_at": "2026-08-25T14:30:44.000Z",
+     "skaters_team": {
+      "id": 11529,
+      "discipline_id": null,
+      "api_id": "b00f15a5-b6c8-4bdb-bc39-09693e943147",
+      "nf_organization_code": "KOR",
+      "gender": null,
+      "image": null,
+      "thumbnail_image": null,
+      "featured_image": null,
+      "slug": "republic-of-korea-194",
+      "members": [],
+      "name": "Republic of Korea",
+      "couple_name": "",
+      "short_name": ""
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 45089,
+       "world_standings_list_stk_competitors_competition_points_id": "27327",
+       "result": "100",
+       "date": "2025-10-11T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45089,
+       "world_standings_list_stk_competitors_competition_points_id": "27328",
+       "result": "80",
+       "date": "2025-10-18T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45089,
+       "world_standings_list_stk_competitors_competition_points_id": "27329",
+       "result": "(36)",
+       "date": "2025-11-22T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45089,
+       "world_standings_list_stk_competitors_competition_points_id": "27330",
+       "result": "60",
+       "date": "2025-11-29T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 45090,
+     "world_standings_list_fsk_id": 609,
+     "skaters_id": null,
+     "skaters_team_id": 11528,
+     "api_id": "1f54cdb7-553e-4bdd-a7c3-f20ba47c600c",
+     "nf_for_country_code": "CAN",
+     "points": 220,
+     "rank": 3,
+     "rank_index": 3,
+     "skaters_type": "Team",
+     "created_at": "2026-08-25T14:30:44.000Z",
+     "skaters_team": {
+      "id": 11528,
+      "discipline_id": null,
+      "api_id": "1f54cdb7-553e-4bdd-a7c3-f20ba47c600c",
+      "nf_organization_code": "CAN",
+      "gender": null,
+      "image": null,
+      "thumbnail_image": null,
+      "featured_image": null,
+      "slug": "canada-509",
+      "members": [],
+      "name": "Canada",
+      "couple_name": "",
+      "short_name": ""
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 45090,
+       "world_standings_list_stk_competitors_competition_points_id": "27331",
+       "result": "70",
+       "date": "2025-10-11T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45090,
+       "world_standings_list_stk_competitors_competition_points_id": "27332",
+       "result": "100",
+       "date": "2025-10-18T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45090,
+       "world_standings_list_stk_competitors_competition_points_id": "27333",
+       "result": "(20)",
+       "date": "2025-11-22T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45090,
+       "world_standings_list_stk_competitors_competition_points_id": "27334",
+       "result": "50",
+       "date": "2025-11-29T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      }
+     ]
+    },
+    {
+     "world_standings_list_fsk_competitors_id": 45091,
+     "world_standings_list_fsk_id": 609,
+     "skaters_id": null,
+     "skaters_team_id": 11533,
+     "api_id": "07db02f3-d47d-4d2a-a065-27ab218ec2bd",
+     "nf_for_country_code": "USA",
+     "points": 200,
+     "rank": 4,
+     "rank_index": 4,
+     "skaters_type": "Team",
+     "created_at": "2026-08-25T14:30:44.000Z",
+     "skaters_team": {
+      "id": 11533,
+      "discipline_id": null,
+      "api_id": "07db02f3-d47d-4d2a-a065-27ab218ec2bd",
+      "nf_organization_code": "USA",
+      "gender": null,
+      "image": null,
+      "thumbnail_image": null,
+      "featured_image": null,
+      "slug": "united-states-129",
+      "members": [],
+      "name": "United States",
+      "couple_name": "",
+      "short_name": ""
+     },
+     "world_standings_list_stk_competitors_competition_points": [
+      {
+       "world_standings_list_fsk_competitors_id": 45091,
+       "world_standings_list_stk_competitors_competition_points_id": "27335",
+       "result": "(32)",
+       "date": "2025-10-11T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 1,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45091,
+       "world_standings_list_stk_competitors_competition_points_id": "27336",
+       "result": "50",
+       "date": "2025-10-18T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "CAN",
+       "display_order": 2,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45091,
+       "world_standings_list_stk_competitors_competition_points_id": "27337",
+       "result": "80",
+       "date": "2025-11-22T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "POL",
+       "display_order": 3,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      },
+      {
+       "world_standings_list_fsk_competitors_id": 45091,
+       "world_standings_list_stk_competitors_competition_points_id": "27338",
+       "result": "70",
+       "date": "2025-11-29T00:00:00.000Z",
+       "name": "Women 3000 m Relay",
+       "country": "NED",
+       "display_order": 4,
+       "created_at": "2026-08-25T14:30:44.000Z"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

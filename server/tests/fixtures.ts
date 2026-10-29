@@ -33,6 +33,8 @@ export function placeHeats(rnd: EventTree['competitions'][number]['rounds'][numb
 }
 
 /** ISU's 2026/27 World Tour standings after World Tour #1: the list and each list's entries (by id). */
+/** 2025/26: men's overall, women's 500 m and relay (with dropped results), a junior list and a world ranking. */
+export const standings2025 = () => JSON.parse(readFileSync(path.join(DATA, 'standings-2025-2026.json'), 'utf8')) as ReturnType<typeof standings2026>;
 export const standings2026 = () => JSON.parse(readFileSync(path.join(DATA, 'standings-2026-2027.json'), 'utf8')) as {
   list: { data: import('../src/isu/types.js').IsuStandingList[] };
   details: Record<string, { data: import('../src/isu/types.js').IsuStandingEntry[] }>;

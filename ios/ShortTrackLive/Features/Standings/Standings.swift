@@ -1,12 +1,16 @@
 import Foundation
 
-/// GET /standings: ISU's World Tour standings for a season.
+/// GET /standings: ISU's standings for a season (World Tour, or World Cup before 2024/25).
 struct StandingsResponse: Decodable, Sendable {
     let season: String?
-    /// The season's World Tour stops in order; every `perEvent` follows it.
+    /// Every season with standings, newest first.
+    let seasons: [String]?
+    let series: String? // "World Tour" | "World Cup"
+    /// The season's stops in order; each list's `eventIndex` points here. Empty
+    /// for seasons where ISU doesn't break the points down.
     let events: [StandingEvent]
-    /// Points for 1st, 2nd, … in one distance at one stop.
-    let pointsPerPlace: [Int]
+    /// Points for 1st, 2nd, … in one distance at one stop; nil for World Cup seasons.
+    let pointsPerPlace: [Int]?
     let lists: [StandingList]
 }
 
@@ -24,7 +28,12 @@ struct StandingList: Decodable, Sendable, Identifiable, Hashable {
     let gender: String // Men | Women | Mixed
     let distance: String? // 500 | 1000 | 1500 | relay | mixed
     let title: String // "Crystal Globe", "500 m", "Relay", "Mixed relay", "Nations"
+    /// For each `perEvent` column, its stop in `events` (a World Cup stop sometimes raced a distance twice).
+    let eventIndex: [Int]?
     let entries: [StandingEntry]
+
+    /// Which list this is, the same in every season: "overall", "500", "nations".
+    var key: String { distance ?? kind }
 
     var isTeams: Bool { kind == "nations" || distance == "relay" || distance == "mixed" }
 }
@@ -54,13 +63,24 @@ struct StandingsBook: Sendable {
 
     var racedCount: Int { response.events.filter(\.raced).count }
 
+    var series: String { response.series ?? "World Tour" }
+
+    /// "After 2 of 7 events", or "Final standings" once they're all raced.
+    var progress: String {
+        let count = response.events.count
+        if count == 0 || racedCount == count { return count == 0 ? "Final standings" : "Final · \(count) events" }
+        return "After \(racedCount) of \(count) events"
+    }
+
     /// Points so far, one row per distance and stop.
     func pointsSoFar(for entry: StandingEntry, gender: String) -> [Earned] {
         distanceLists(gender: gender).flatMap { list -> [Earned] in
             guard let mine = list.entries.first(where: { $0.matches(entry) }) else { return [] }
-            return zip(response.events, mine.perEvent).compactMap { event, points -> Earned? in
-                guard let points else { return nil }
-                let place = response.pointsPerPlace.firstIndex(of: points).map { Fmt.ordinal($0 + 1) }
+            let stops = list.eventIndex ?? Array(mine.perEvent.indices)
+            return zip(stops, mine.perEvent).compactMap { stop, points -> Earned? in
+                guard let points, response.events.indices.contains(stop) else { return nil }
+                let event = response.events[stop]
+                let place = response.pointsPerPlace?.firstIndex(of: points).map { Fmt.ordinal($0 + 1) }
                 return Earned(distance: list.title, place: place, event: [event.name, event.city].compactMap { $0 }.joined(separator: ", "),
                               points: points)
             }

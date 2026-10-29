@@ -12,7 +12,7 @@ import { createApp } from '../src/api/app.js';
 import { createPool } from '../src/db/pool.js';
 import { Ingest } from '../src/db/ingest.js';
 import { StandingsSync } from '../src/sync/standings.js';
-import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, standings2026, tree } from './fixtures.js';
+import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, standings2025, standings2026, tree } from './fixtures.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const MIGRATIONS = path.resolve(import.meta.dirname, '../../supabase/migrations');
@@ -265,22 +265,46 @@ describe.skipIf(!url)('database + API', () => {
 
   describe('standings', () => {
     const fixture = standings2026();
+    const past = standings2025();
+    // ISU season ids: 47 = 2026/27, 1 = 2025/26.
+    const bySeason: Record<number, typeof fixture> = { 47: fixture, 1: past };
     const source = {
       calls: 0,
-      async standingLists() { return fixture.list.data; },
-      async standing(id: number) { this.calls++; return fixture.details[String(id)]?.data ?? []; },
+      async standingLists(seasonId: number) { return bySeason[seasonId]?.list.data ?? []; },
+      async standing(id: number) {
+        this.calls++;
+        return fixture.details[String(id)]?.data ?? past.details[String(id)]?.data ?? [];
+      },
     };
 
-    it('loads ISU\'s World Tour standings once, and again only when ISU updates them', async () => {
+    it('loads ISU\'s standings once (past seasons only the first time), and again only when ISU updates them', async () => {
       const sync = new StandingsSync(source, pool, () => {});
-      expect(await sync.refresh()).toBe(12);
+      expect(await sync.refresh()).toBe(12 + 3); // 2025/26: overall, 500 m, relay; not the junior list or the ranking
       expect(await sync.refresh()).toBe(0);
-      expect(source.calls).toBe(12);
+      expect(source.calls).toBe(15);
+      // A new process doesn't reload a past season it already has.
+      expect(await new StandingsSync(source, pool, () => {}).refresh()).toBe(0);
+    });
+
+    it('GET /standings?season= has a past season, its events matched by date', async () => {
+      const { body } = await request(app).get('/standings/2025-2026').expect(200);
+      await request(app).get('/standings/2018-2019').expect(404);
+      expect(body).toMatchObject({ season: '2025/2026', seasons: ['2026/2027', '2025/2026'], series: 'World Tour' });
+      expect(body.events.map((e: { code: string }) => e.code)).toEqual(['CAN1', 'CAN2', 'POL', 'NED']);
+      // We only have the first Montréal stop of 2025/26.
+      expect(body.events[0]).toMatchObject({ slug: WT1_2025, raced: true });
+      expect(body.events[1].slug).toBeNull();
+      type L = { gender: string; title: string; entries: { nat: string; points: number; perEvent: (number | null)[] }[] };
+      const lists = body.lists as L[];
+      expect(lists.map((l) => `${l.gender} ${l.title}`)).toEqual(['Women 500 m', 'Women Relay', 'Men Crystal Globe']);
+      // A relay's dropped result "(60)" isn't one of its points.
+      expect(lists[1]!.entries[0]).toMatchObject({ nat: 'NED', points: 280, perEvent: [80, null, 100, 100] });
     });
 
     it('GET /standings has every list with skaters linked to their results', async () => {
       const { body } = await request(app).get('/standings').expect(200);
       expect(body.season).toBe('2026/2027');
+      expect(body.seasons).toEqual(['2026/2027', '2025/2026']);
       expect(body.events.map((e: { code: string }) => e.code)).toEqual(['CAN1', 'CAN2', 'KOR', 'CHN1', 'CHN2', 'POL', 'NED']);
       expect(body.events[0]).toMatchObject({ name: 'World Tour #1', city: 'Vancouver', slug: WT1_2026, raced: true });
       expect(body.events[1].raced).toBe(false);
@@ -292,6 +316,7 @@ describe.skipIf(!url)('database + API', () => {
         'Men Crystal Globe', 'Men 500 m', 'Men 1000 m', 'Men 1500 m', 'Men Relay',
         'Mixed Mixed relay', 'Mixed Nations',
       ]);
+      expect((lists[0] as L & { eventIndex: number[] }).eventIndex).toEqual([0, 1, 2, 3, 4, 5, 6]);
       const leader = lists[0]!.entries[0]!;
       expect(leader).toMatchObject({ rank: 1, points: 224, name: 'Courtney Sarault', last: 'Sarault', nat: 'CAN', iso2: 'CA' });
       expect(leader.skaterId).toEqual(expect.any(Number));
