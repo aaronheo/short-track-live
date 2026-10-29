@@ -4,6 +4,7 @@ import { shortCountry, statusCode } from '../src/domain/codes.js';
 import { distanceLabel, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
+import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/picks.js';
 import { parseRule } from '../src/domain/rules.js';
 import { WORLD_TOUR_POINTS, classifyStanding, standingEventCity, titleCaseName } from '../src/domain/standings.js';
 import { summarize } from '../src/domain/summary.js';
@@ -322,5 +323,50 @@ describe('standings', () => {
     expect(standingEventCity('')).toBeNull();
     expect(titleCaseName('SANTOS-GRISWOLD')).toBe('Santos-Griswold');
     expect(titleCaseName("VAN 'T WOUT")).toBe("Van 't Wout");
+  });
+});
+
+describe('picks', () => {
+  // Real result: Women 1000 m SF2, WT1 Vancouver. Velzeboer 1, Kim 2, Sarault 3, Topolska 4, Shim 5.
+  const results = [
+    { entryId: 1, rank: 3, status: null }, // Sarault
+    { entryId: 2, rank: 1, status: null }, // Velzeboer
+    { entryId: 3, rank: 5, status: null }, // Shim
+    { entryId: 4, rank: 2, status: null }, // Kim
+    { entryId: 5, rank: 4, status: null }, // Topolska
+  ];
+
+  it('scores 3 for an exact place, 1 for one off, 3 for a penalty called right', () => {
+    // The pick on the designs: Velzeboer, Sarault, Kim, Shim; Topolska penalized.
+    const s = scorePick({ finish: [2, 1, 4, 3], penalized: [5] }, results);
+    expect(s.entries.map((e) => e.points)).toEqual([3, 1, 1, 1, 0]);
+    expect(s).toMatchObject({ points: 6, max: 15 });
+    const pen = scorePick({ finish: [2, 4, 1, 5], penalized: [3] }, [...results.slice(0, 2), { entryId: 3, rank: null, status: 'YC' }, ...results.slice(3)]);
+    expect(pen.entries.at(-1)).toEqual({ entryId: 3, picked: null, points: 3 });
+    // Someone actually penalized but picked to place scores 0 for them.
+    expect(scorePick({ finish: [3, 2, 4, 1, 5], penalized: [] }, [{ entryId: 3, rank: null, status: 'PEN' }, ...results.filter((r) => r.entryId !== 3)]).entries[0]!.points).toBe(0);
+  });
+
+  it('needs every skater placed or penalized once', () => {
+    expect(validPick({ finish: [1, 2, 3, 4], penalized: [5] }, [1, 2, 3, 4, 5])).toBe(true);
+    expect(validPick({ finish: [1, 2, 3, 4], penalized: [] }, [1, 2, 3, 4, 5])).toBe(false);
+    expect(validPick({ finish: [1, 1, 3, 4, 5], penalized: [] }, [1, 2, 3, 4, 5])).toBe(false);
+    expect(validPick({ finish: [1, 2, 3, 4, 9], penalized: [] }, [1, 2, 3, 4, 5])).toBe(false);
+  });
+
+  it('cleans nicknames', () => {
+    expect(cleanNickname('  Speedy   Skater ')).toBe('Speedy Skater');
+    expect(cleanNickname("Jens Van 't Fan")).toBe("Jens Van 't Fan");
+    expect(cleanNickname('a')).toBeNull();
+    expect(cleanNickname('x'.repeat(21))).toBeNull();
+    expect(cleanNickname('<script>')).toBeNull();
+    expect(cleanNickname(42)).toBeNull();
+  });
+
+  it('draws the line after the qualifying places, or the podium in an A final', () => {
+    expect(cutLine({ name: 'Semifinals', auto_places: 2, destination: 'Final' }, 'Heat 2')).toEqual({ after: 2, label: 'To the final' });
+    expect(cutLine({ name: 'Quarterfinals', auto_places: 2, destination: 'Semifinals' }, 'Heat 1')).toEqual({ after: 2, label: 'To the semifinals' });
+    expect(cutLine({ name: 'Finals', auto_places: null, destination: null }, 'Final A')).toEqual({ after: 3, label: 'Podium' });
+    expect(cutLine({ name: 'Finals', auto_places: null, destination: null }, 'Final B')).toBeNull();
   });
 });

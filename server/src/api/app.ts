@@ -4,9 +4,11 @@ import type { ChatEvents, ChatMessage } from '../chat/chat.js';
 import { RateLimit } from '../chat/chat.js';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
+import { cleanNickname } from '../domain/picks.js';
 import { Accounts, cleanSettings, parseFavorites, type VerifyGoogle } from './accounts.js';
 import { Athletes, type RaceFilters } from './athletes.js';
 import { Favorites } from './favorites.js';
+import { Picks } from './picks.js';
 import { Repo } from './repo.js';
 import { Standings } from './standings.js';
 import { dayOfEvent, eventSummary, heatView, onTheIce, roundView, scheduleView, type EventsResponse } from './views.js';
@@ -208,6 +210,41 @@ export function createApp(db: Db, opts: AppOptions = {}) {
   app.delete('/me', signedIn(async (_req, res, accountId) => {
     await accounts.remove(accountId);
     res.status(204).end();
+  }));
+
+  app.put('/me/nickname', express.json({ limit: '4kb' }), signedIn(async (req, res, accountId) => {
+    const nickname = cleanNickname(req.body?.nickname);
+    if (!nickname) return res.status(400).json({ error: 'Use 2–20 letters, numbers or spaces.' });
+    if (await accounts.setNickname(accountId, nickname) === 'taken') return res.status(409).json({ error: 'Someone already has that name.' });
+    res.json({ nickname });
+  }));
+
+  // Picks. Reading works signed out (no pick of your own); picking needs a session and a nickname.
+  // PUT /picks/heats/:id { finish: [entry ids], penalized: [entry ids] }
+  const picks = new Picks(db);
+  const optionalAccount = async (req: Request) => {
+    const token = sessionOf(req);
+    return token ? accounts.fromToken(token) : null;
+  };
+  app.get('/picks', wrap(async (req, res) => {
+    res.json(await picks.home(await optionalAccount(req), now()));
+  }));
+  app.get('/picks/heats/:id', wrap(async (req, res) => {
+    const view = await picks.heat(Number(req.params.id), await optionalAccount(req));
+    if (!view) return res.status(404).json({ error: 'Picks are for quarterfinals, semifinals and finals.' });
+    res.json(view);
+  }));
+  app.put('/picks/heats/:id', express.json({ limit: '8kb' }), signedIn(async (req, res, accountId) => {
+    const list = (v: unknown) => (Array.isArray(v) && v.every((x) => Number.isInteger(x)) ? (v as number[]) : null);
+    const finish = list(req.body?.finish);
+    const penalized = list(req.body?.penalized ?? []);
+    if (!finish || !penalized) return res.status(400).json({ error: 'Send finish and penalized as entry ids.' });
+    const result = await picks.save(accountId, Number(req.params.id), { finish, penalized });
+    if (result === 'not_found') return res.status(404).json({ error: 'Picks are for quarterfinals, semifinals and finals.' });
+    if (result === 'locked') return res.status(409).json({ error: 'This race has started; picks are locked.', locked: true });
+    if (result === 'needs_nickname') return res.status(409).json({ error: 'Choose a nickname first.', needsNickname: true });
+    if (result === 'invalid') return res.status(400).json({ error: 'Place or penalize every skater once.' });
+    res.json(result);
   }));
 
   // Ask. Body: { messages: [{ role: 'user' | 'assistant', content }] }, the

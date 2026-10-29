@@ -17,7 +17,7 @@ export interface Settings {
 }
 
 export interface AccountState {
-  account: { name: string | null; email: string | null; provider: 'google' };
+  account: { name: string | null; email: string | null; provider: 'google'; nickname: string | null };
   favorites: { id: number; name: string; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; addedAt: string }[];
   settings: Settings;
   updatedAt: string;
@@ -96,8 +96,8 @@ export class Accounts {
   }
 
   async state(accountId: number): Promise<AccountState | null> {
-    const account = (await this.db.query<{ name: string | null; email: string | null; settings: unknown; updated_at: Date }>(
-      'select name, email, settings, updated_at from account where id = $1', [accountId])).rows[0];
+    const account = (await this.db.query<{ name: string | null; email: string | null; nickname: string | null; settings: unknown; updated_at: Date }>(
+      'select name, email, nickname, settings, updated_at from account where id = $1', [accountId])).rows[0];
     if (!account) return null;
     const favorites = (await this.db.query<{
       id: number; first_name: string | null; last_name: string; nation: string | null; iso2: string | null; gender: string | null; added_at: Date;
@@ -106,7 +106,7 @@ export class Accounts {
        from account_favorite f join skater s on s.id = f.skater_id left join nation n on n.code = s.nation
        where f.account_id = $1 order by f.added_at, s.id`, [accountId])).rows;
     return {
-      account: { name: account.name, email: account.email, provider: 'google' },
+      account: { name: account.name, email: account.email, provider: 'google', nickname: account.nickname },
       favorites: favorites.map((f) => ({
         id: f.id, name: f.first_name ? `${f.first_name} ${f.last_name}` : f.last_name, last: f.last_name,
         nat: f.nation, iso2: f.iso2, gender: GENDER[f.gender ?? ''] ?? null, addedAt: f.added_at.toISOString(),
@@ -114,6 +114,17 @@ export class Accounts {
       settings: cleanSettings(account.settings),
       updatedAt: account.updated_at.toISOString(),
     };
+  }
+
+  /** The name on leaderboards (and in chat). 'taken' when someone else has it, ignoring case. */
+  async setNickname(accountId: number, nickname: string): Promise<'ok' | 'taken'> {
+    try {
+      await this.db.query('update account set nickname = $2 where id = $1', [accountId, nickname]);
+      return 'ok';
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') return 'taken';
+      throw err;
+    }
   }
 
   /** Replaces the saved favorites and settings with the phone's. Unknown skaters are left out. */

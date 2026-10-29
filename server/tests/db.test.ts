@@ -371,6 +371,77 @@ describe.skipIf(!url)('database + API', () => {
     });
   });
 
+  describe('picks', () => {
+    const api = () => createApp(pool, {
+      now: () => NOW,
+      google: async (idToken) => ({ sub: idToken, email: `${idToken}@example.com`, name: idToken }),
+    });
+    const session = async (sub: string) => (await request(api()).post('/auth/google').send({ idToken: sub }).expect(200)).body.session as string;
+    const heatOf = (round: string, heat: string, state: string) => one<{ id: number }>(
+      `select h.id from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
+       where e.slug = $1 and r.name = $2 and h.name = $3 and h.state = $4 order by h.starts_at limit 1`, [WT1_2026, round, heat, state]);
+
+    it('nicknames are unique, ignoring case', async () => {
+      const a = await session('pick-a');
+      const b = await session('pick-b');
+      await request(api()).put('/me/nickname').set('X-Session', a).send({ nickname: 'x' }).expect(400);
+      expect((await request(api()).put('/me/nickname').set('X-Session', a).send({ nickname: ' Ice Fan ' }).expect(200)).body).toEqual({ nickname: 'Ice Fan' });
+      await request(api()).put('/me/nickname').set('X-Session', b).send({ nickname: 'ice fan' }).expect(409);
+      await request(api()).put('/me/nickname').set('X-Session', b).send({ nickname: 'Short Tracker' }).expect(200);
+      expect((await request(api()).get('/me').set('X-Session', a).expect(200)).body.account.nickname).toBe('Ice Fan');
+    });
+
+    it('picks a quarterfinal before it starts, then shows how everyone picked', async () => {
+      const a = await session('pick-a');
+      const b = await session('pick-b');
+      const fresh = await session('pick-no-name');
+      const { id } = await heatOf('Quarterfinals', 'Heat 6', 'start_list');
+      const view = (await request(api()).get(`/picks/heats/${id}`).set('X-Session', a).expect(200)).body;
+      expect(view).toMatchObject({ locked: false, myPick: null, crowd: null, result: null });
+      expect(view.cut).toMatchObject({ after: 2 });
+      const order: number[] = view.entries.map((e: { entryId: number }) => e.entryId);
+      expect(view.entries[0].start).toBe(1);
+
+      await request(api()).put(`/picks/heats/${id}`).set('X-Session', fresh).send({ finish: order, penalized: [] }).expect(409);
+      await request(api()).put(`/picks/heats/${id}`).set('X-Session', a).send({ finish: order.slice(1), penalized: [] }).expect(400);
+      const saved = (await request(api()).put(`/picks/heats/${id}`).set('X-Session', a)
+        .send({ finish: order.slice(0, -1), penalized: order.slice(-1) }).expect(200)).body;
+      expect(saved.myPick).toEqual({ finish: order.slice(0, -1), penalized: order.slice(-1) });
+      expect(saved.crowd).toMatchObject({ picks: 1, mostPicked: { share: 100 } });
+      await request(api()).put(`/picks/heats/${id}`).set('X-Session', b).send({ finish: [...order].reverse(), penalized: [] }).expect(200);
+      const crowd = (await request(api()).get(`/picks/heats/${id}`).set('X-Session', a).expect(200)).body.crowd;
+      expect(crowd.picks).toBe(2);
+      expect(crowd.entries[0].places[0]).toBe(50);
+      // Signed out: no pick of your own, and no peeking before the race.
+      expect((await request(api()).get(`/picks/heats/${id}`).expect(200)).body).toMatchObject({ myPick: null, crowd: null });
+
+      const home = (await request(api()).get('/picks').set('X-Session', a).expect(200)).body;
+      expect(home).toMatchObject({ signedIn: true, nickname: 'Ice Fan', event: { slug: WT1_2026 }, players: 2 });
+      expect(home.mine.map((m: { heatId: number }) => m.heatId)).toEqual([id]);
+      expect(home.open.length).toBeGreaterThan(0);
+    });
+
+    it('locks once the race is raced, and scores it when official', async () => {
+      const a = await session('pick-a');
+      const done = await heatOf('Quarterfinals', 'Heat 1', 'official');
+      const entries = (await pool.query<{ id: string; rank: number | null }>(
+        'select id, rank from entry where heat_id = $1 order by rank nulls last, id', [done.id])).rows.map((r) => Number(r.id));
+      await request(api()).put(`/picks/heats/${done.id}`).set('X-Session', a).send({ finish: entries, penalized: [] }).expect(409);
+      // A pick made before the race (inserted as if earlier): the exact result.
+      const accountId = (await one<{ id: number }>("select id from account where google_sub = 'pick-a'")).id;
+      await pool.query('insert into pick (account_id, heat_id, finish, penalized) values ($1, $2, $3, $4)', [accountId, done.id, entries, []]);
+      const view = (await request(api()).get(`/picks/heats/${done.id}`).set('X-Session', a).expect(200)).body;
+      expect(view.locked).toBe(true);
+      expect(view.result.score).toMatchObject({ points: entries.length * 3, max: entries.length * 3 });
+      const home = (await request(api()).get('/picks').set('X-Session', a).expect(200)).body;
+      expect(home.me).toMatchObject({ points: entries.length * 3, picked: 2, rank: 1 });
+      expect(home.leaderboard[0]).toMatchObject({ nickname: 'Ice Fan', points: entries.length * 3, me: true });
+      // Not a pickable round.
+      const heats = await heatOf('Heats', 'Heat 1', 'official');
+      await request(api()).get(`/picks/heats/${heats.id}`).expect(404);
+    });
+  });
+
   it('answers 304 when nothing changed', async () => {
     const first = await request(app).get(`/events/${WT1_2026}/schedule`).expect(200);
     await request(app).get(`/events/${WT1_2026}/schedule`).set('If-None-Match', first.headers.etag!).expect(304);
