@@ -92,15 +92,19 @@ struct RootView: View {
 
 /// The tab bar hides while you scroll down and comes back when you scroll
 /// up or reach the top. Put on each screen's scroll view.
+/// Phone layout only: on wide screens the bar sits at the top over both
+/// columns, so hiding it would jump the whole window when one column scrolls.
 struct TabBarHidesOnScroll: ViewModifier {
+    @Environment(AppModel.self) private var model
     @State private var hidden = false
 
     func body(content: Content) -> some View {
         content
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { old, new in
-                let next = new < 24 ? false : new - old > 6 ? true : new - old < -6 ? false : hidden
+                let next = model.isSplit || new < 24 ? false : new - old > 6 ? true : new - old < -6 ? false : hidden
                 if next != hidden { withAnimation(.snappy) { hidden = next } }
             }
+            .onChange(of: model.isSplit) { if model.isSplit { hidden = false } }
             // .automatic, not .visible: a root screen saying .visible would
             // keep the bar up over a pushed screen that hides it (Ask).
             .toolbarVisibility(hidden ? .hidden : .automatic, for: .tabBar)
