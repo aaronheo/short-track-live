@@ -33,7 +33,6 @@ struct RootView: View {
     @State private var inbox = AlertInbox.shared
     @Environment(\.scenePhase) private var phase
     @State private var split = false
-    @State private var tabBarAtSide = false
     @AppStorage("appearance") private var appearance = Appearance.system
 
     var body: some View {
@@ -51,16 +50,17 @@ struct RootView: View {
                 ProfileView()
             }
             Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                SearchTab(split: split, tabBarAtSide: tabBarAtSide)
+                SearchTab(split: split, tabBarAtSide: model.tabBarAtSide)
             }
         }
         // Width decides the layout (not a GeometryReader around the tabs,
         // which stops the tab bar from seeing the scrolling).
         .onGeometryChange(for: Bool.self) { $0.size.width >= 600 } action: { split = $0 }
         .onChange(of: split, initial: true) { _, split in model.setSplit(split) }
-        // The Duo's cover screen puts the status and tab bars down the trailing
-        // edge: an inset on that side only (a landscape phone has both sides inset).
-        .onGeometryChange(for: Bool.self) { $0.safeAreaInsets.trailing > $0.safeAreaInsets.leading + 20 } action: { tabBarAtSide = $0 }
+        // The Duo's cover screen puts the status and tab bars down one side
+        // (left or right, depending on how it's turned): an inset on that side
+        // only (a landscape phone has both sides inset).
+        .onGeometryChange(for: Bool.self) { abs($0.safeAreaInsets.trailing - $0.safeAreaInsets.leading) > 20 } action: { model.tabBarAtSide = $0 }
         .environment(model)
         .environment(favorites)
         .environment(account)
@@ -92,8 +92,8 @@ struct RootView: View {
 
 /// The tab bar hides while you scroll down and comes back when you scroll
 /// up or reach the top. Put on each screen's scroll view.
-/// Phone layout only: on wide screens the bar sits at the top over both
-/// columns, so hiding it would jump the whole window when one column scrolls.
+/// Not when the bar is fixed (AppModel.tabBarFixed): wide screens and the
+/// Duo's cover screen, where it's out of the way already.
 struct TabBarHidesOnScroll: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var hidden = false
@@ -101,10 +101,10 @@ struct TabBarHidesOnScroll: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { old, new in
-                let next = model.isSplit || new < 24 ? false : new - old > 6 ? true : new - old < -6 ? false : hidden
+                let next = model.tabBarFixed || new < 24 ? false : new - old > 6 ? true : new - old < -6 ? false : hidden
                 if next != hidden { withAnimation(.snappy) { hidden = next } }
             }
-            .onChange(of: model.isSplit) { if model.isSplit { hidden = false } }
+            .onChange(of: model.tabBarFixed) { if model.tabBarFixed { hidden = false } }
             // .automatic, not .visible: a root screen saying .visible would
             // keep the bar up over a pushed screen that hides it (Ask).
             .toolbarVisibility(hidden ? .hidden : .automatic, for: .tabBar)

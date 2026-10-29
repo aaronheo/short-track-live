@@ -37,6 +37,11 @@ final class AppModel {
     var searchDetailPath: [Route] = []
 
     private(set) var isSplit = false
+    /// The Duo's cover screen puts the tab bar down the side.
+    var tabBarAtSide = false
+    /// The tab bar stays put while scrolling: wide layouts have it across the
+    /// top of both columns, and the Duo's cover screen has it down the side.
+    var tabBarFixed: Bool { isSplit || tabBarAtSide }
     /// The round on screen, after any switch with the round chips; the
     /// schedule highlights it in the sidebar.
     var visibleRound: Int?
