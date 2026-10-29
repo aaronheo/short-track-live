@@ -359,7 +359,7 @@ struct StandingDetail: View {
         let rows = book.pointsSoFar(for: entry, gender: list.gender)
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Points so far").sectionLabel().padding(.leading, 16)
+                Text(book.racedCount == book.response.events.count ? "Points by event" : "Points so far").sectionLabel().padding(.leading, 16)
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                         if index > 0 { RowDivider(leading: 16) }
