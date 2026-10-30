@@ -16,7 +16,7 @@ import { Ingest } from '../src/db/ingest.js';
 import { IsuClient } from '../src/isu/client.js';
 import { IsuRecorder } from '../src/isu/recorder.js';
 import { StandingsSync } from '../src/sync/standings.js';
-import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, standings2025, standings2026, tree } from './fixtures.js';
+import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, round, standings2025, standings2026, tree } from './fixtures.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const MIGRATIONS = path.resolve(import.meta.dirname, '../../supabase/migrations');
@@ -55,6 +55,37 @@ describe.skipIf(!url)('database + API', () => {
     const before = await one<{ n: number }>('select count(*)::int as n from lap');
     await new Ingest(pool).loadTree(tree(WT1_2026));
     expect(await one<{ n: number }>('select count(*)::int as n from lap')).toEqual(before);
+  });
+
+  it('keeps a complete start list when ISU briefly returns most entrants missing', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const { id } = await one<{ id: number }>(
+        `select r.id from round r join competition c on c.id = r.competition_id join event e on e.id = c.event_id
+         where e.slug = $1 and c.name = 'Men 1500 m' and r.name = 'Quarterfinals'`, [WT1_2026]);
+      const { rnd } = round(tree(WT1_2026), 'Men 1500 m', 'Quarterfinals');
+      const full = structuredClone(rnd.heats);
+      for (const heat of full) {
+        heat.status = 'Scheduled';
+        heat.result_status = 'Start List';
+      }
+      const ingest = new Ingest(client);
+      const opts = { round: 'Quarterfinals', eventFinished: false };
+      await ingest.loadHeats(id, 'America/Vancouver', full, false, opts);
+      const expected = full.reduce((total, heat) => total + (heat.event_result_round_heats_competitors?.length ?? 0), 0);
+
+      const partial = structuredClone(full);
+      for (const heat of partial) heat.event_result_round_heats_competitors = heat.event_result_round_heats_competitors?.slice(0, 2) ?? [];
+      await ingest.loadHeats(id, 'America/Vancouver', partial, false, opts);
+
+      const actual = await client.query<{ entries: number }>(
+        `select count(*)::int as entries from entry e join heat h on h.id = e.heat_id where h.round_id = $1`, [id]);
+      expect(actual.rows[0]!.entries).toBe(expected);
+    } finally {
+      await client.query('rollback');
+      client.release();
+    }
   });
 
   it('builds schedules from ISU, from names, and from round times', async () => {

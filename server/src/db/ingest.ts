@@ -205,6 +205,21 @@ export class Ingest {
     })));
 
     const perHeat = heats.map((h) => ({ heatId: heatIds.get(h.event_result_round_heats_id)!, entries: normalizeEntries(h.event_result_round_heats_competitors) }));
+    const previous = await this.db.query<{ heat_id: number; entries: number }>(
+      `select h.id as heat_id, count(e.id)::int as entries
+       from heat h left join entry e on e.heat_id = h.id
+       where h.id = any($1::int[]) group by h.id`, [perHeat.map((h) => h.heatId)]);
+    const previousEntries = new Map(previous.rows.map((r) => [r.heat_id, r.entries]));
+    const wasStartList = (h: IsuHeat) => h.result_status === 'Start List';
+    const incomingTotal = perHeat.reduce((total, h) => total + h.entries.length, 0);
+    const previousTotal = previous.rows.reduce((total, h) => total + h.entries, 0);
+    // ISU occasionally drops most of an entire start list from a live response.
+    // Keep the roster we already have until ISU sends a credible replacement.
+    const partialStartList = previousTotal > 0 && incomingTotal * 2 < previousTotal
+      && heats.every(wasStartList);
+    const protectedHeats = new Set(partialStartList
+      ? perHeat.filter((h, i) => wasStartList(heats[i]!) && h.entries.length < (previousEntries.get(h.heatId) ?? 0)).map((h) => h.heatId)
+      : []);
     const all = perHeat.flatMap((h) => h.entries);
     await this.nations(all.flatMap((e) => [[e.nat, null], [e.skater?.nationality_code, null], [e.team?.nf_organization_code, null]] as [string | null | undefined, string | null][]));
     const skaterIds = await this.skaters([...all.flatMap((e) => (e.skater ? [e.skater] : [])), ...all.flatMap((e) => e.members)]);
@@ -222,9 +237,13 @@ export class Ingest {
       ['time_text', 'text'], ['status', 'text'], ['qualification', 'text'], ['record', 'text'],
     ], entryRows);
 
-    // Drop entries ISU no longer lists (a start list that changed, a duplicate we skipped).
-    await this.db.query(`delete from entry where heat_id = any($1::int[]) and not (id = any($2::bigint[]))`,
-      [perHeat.map((h) => h.heatId), [...entryIds.values()]]);
+    // Drop entries ISU no longer lists (a start list that changed, a duplicate we skipped),
+    // except for a start list that ISU has clearly returned only in part.
+    const heatsToPrune = perHeat.filter((h) => !protectedHeats.has(h.heatId)).map((h) => h.heatId);
+    if (heatsToPrune.length) {
+      await this.db.query(`delete from entry where heat_id = any($1::int[]) and not (id = any($2::bigint[]))`,
+        [heatsToPrune, [...entryIds.values()]]);
+    }
 
     const ids = [...entryIds.values()];
     await this.db.query('delete from lap where entry_id = any($1::bigint[])', [ids]);
