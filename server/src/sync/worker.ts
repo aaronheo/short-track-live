@@ -9,7 +9,7 @@ import { StandingsSync } from './standings.js';
 // Polling policy. ISU only ever gets one request at a time from us (IsuClient
 // queues them, at most one per second).
 const STRUCTURE_EVERY = 60_000; // live event: schedule, competitions, rounds
-const HOT_HEATS_EVERY = 5_000; // a round that's racing (or due within ±15 min)
+const HOT_HEATS_EVERY = 10_000; // a round that's racing (or due within ±15 min)
 const START_LISTS_EVERY = 10 * 60_000; // upcoming rounds in the next 24 h
 const EVENT_LIST_EVERY = 24 * 60 * 60_000; // current season's event list
 const LIVE_EVENT_LIST_EVERY = 30 * 60_000; // ...more often while an event is live, to see it finish

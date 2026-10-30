@@ -17,7 +17,7 @@ struct RoundView: View {
     private static func load(_ id: Int) -> Live<RoundResponse> {
         Live("rounds/\(id)") { round in
             if round.round.state == .live || round.heats.contains(where: { $0.state == .running || $0.state == .unofficial }) {
-                return .seconds(5)
+                return .seconds(10)
             }
             if round.round.state == .upcoming || round.heats.contains(where: { !$0.state.isFinished }) { return .seconds(30) }
             return nil // finished and official: it won't change again

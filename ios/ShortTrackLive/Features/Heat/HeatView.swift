@@ -9,7 +9,7 @@ struct HeatView: View {
     init(id: Int) {
         _live = State(initialValue: Live("heats/\(id)") { heat in
             switch heat.heat.state {
-            case .running, .unofficial: .seconds(5)
+            case .running, .unofficial: .seconds(10)
             case .official: nil
             case .scheduled, .startList: .seconds(30)
             }

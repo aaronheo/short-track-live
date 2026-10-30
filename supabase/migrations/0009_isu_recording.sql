@@ -1,6 +1,6 @@
 -- What ISU answered while an event was live, with when, so a weekend can be
 -- played back later to test the live features. Only responses that changed
--- since the last one for the same request are kept (most 5 s polls repeat).
+-- since the last one for the same request are kept (most polls repeat).
 create table isu_recording (
   id bigint generated always as identity primary key,
   fetched_at timestamptz not null default now(),
