@@ -76,7 +76,14 @@ describe.skipIf(!url)('database + API', () => {
       const expected = full.reduce((total, heat) => total + (heat.event_result_round_heats_competitors?.length ?? 0), 0);
 
       const partial = structuredClone(full);
-      for (const heat of partial) heat.event_result_round_heats_competitors = heat.event_result_round_heats_competitors?.slice(0, 2) ?? [];
+      for (const [index, heat] of partial.entries()) {
+        if (index < 3) {
+          heat.status = 'Finished';
+          heat.result_status = 'Official';
+        } else {
+          heat.event_result_round_heats_competitors = heat.event_result_round_heats_competitors?.slice(0, 2) ?? [];
+        }
+      }
       await ingest.loadHeats(id, 'America/Vancouver', partial, false, opts);
 
       const actual = await client.query<{ entries: number }>(

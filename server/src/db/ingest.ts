@@ -211,15 +211,11 @@ export class Ingest {
        where h.id = any($1::int[]) group by h.id`, [perHeat.map((h) => h.heatId)]);
     const previousEntries = new Map(previous.rows.map((r) => [r.heat_id, r.entries]));
     const wasStartList = (h: IsuHeat) => h.result_status === 'Start List';
-    const incomingTotal = perHeat.reduce((total, h) => total + h.entries.length, 0);
-    const previousTotal = previous.rows.reduce((total, h) => total + h.entries, 0);
-    // ISU occasionally drops most of an entire start list from a live response.
-    // Keep the roster we already have until ISU sends a credible replacement.
-    const partialStartList = previousTotal > 0 && incomingTotal * 2 < previousTotal
-      && heats.every(wasStartList);
-    const protectedHeats = new Set(partialStartList
-      ? perHeat.filter((h, i) => wasStartList(heats[i]!) && h.entries.length < (previousEntries.get(h.heatId) ?? 0)).map((h) => h.heatId)
-      : []);
+    // ISU occasionally drops most of an individual start list from a live
+    // response. Keep a roster until its replacement is at least half as large.
+    const protectedHeats = new Set(perHeat
+      .filter((h, i) => wasStartList(heats[i]!) && h.entries.length * 2 < (previousEntries.get(h.heatId) ?? 0))
+      .map((h) => h.heatId));
     const all = perHeat.flatMap((h) => h.entries);
     await this.nations(all.flatMap((e) => [[e.nat, null], [e.skater?.nationality_code, null], [e.team?.nf_organization_code, null]] as [string | null | undefined, string | null][]));
     const skaterIds = await this.skaters([...all.flatMap((e) => (e.skater ? [e.skater] : [])), ...all.flatMap((e) => e.members)]);
