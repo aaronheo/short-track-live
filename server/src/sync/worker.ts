@@ -26,6 +26,16 @@ const LIVE_STANDINGS_EVERY = 60 * 60_000; // ...hourly around an event: ISU reca
 
 type Log = (msg: string) => void;
 
+export interface PollRound {
+  id: number; isu_id: number; comp_isu_id: number; is_relay: boolean;
+  hot: boolean; running: boolean;
+}
+
+/** Keep the race in progress ahead of nearby and background start lists. */
+export function prioritizeRounds(rounds: PollRound[]): PollRound[] {
+  return [...rounds].sort((a, b) => Number(b.running) - Number(a.running) || Number(b.hot) - Number(a.hot));
+}
+
 export class SyncWorker {
   private readonly ingest: Ingest;
   private readonly standings: StandingsSync;
@@ -176,17 +186,17 @@ export class SyncWorker {
 
     this.isu.recording = true;
     for (const ev of live) {
-      if (now - (this.lastStructure.get(ev.id) ?? 0) >= STRUCTURE_EVERY) {
+      const rounds = prioritizeRounds(await this.roundsToPoll(ev.id, now));
+      // Ask for the active (or imminently starting) race first. A structure
+      // refresh can fan out into dozens of ISU calls, so never put it ahead of
+      // a running heat on the shared one-request-per-second queue.
+      await this.pollRounds(rounds.filter((r) => r.hot), now);
+      if (!rounds.some((r) => r.running)
+        && now - (this.lastStructure.get(ev.id) ?? 0) >= STRUCTURE_EVERY) {
         this.lastStructure.set(ev.id, now);
         await this.refreshStructure(ev);
       }
-      for (const r of await this.roundsToPoll(ev.id, now)) {
-        const every = r.hot ? HOT_HEATS_EVERY : START_LISTS_EVERY;
-        if (now - (this.lastHeats.get(r.id) ?? 0) < every) continue;
-        this.lastHeats.set(r.id, now);
-        const heats = await this.isu.heats(r.comp_isu_id, r.isu_id, r.is_relay);
-        await this.ingest.loadRoundHeats(r.isu_id, heats, r.is_relay);
-      }
+      if (!rounds.some((r) => r.running)) await this.pollRounds(rounds.filter((r) => !r.hot), now);
       if (ev.state === 'finished' && now - (this.lastFinishCheck.get(ev.id) ?? 0) >= FINISH_CHECK_EVERY) {
         this.lastFinishCheck.set(ev.id, now);
         await this.finishEvent(ev);
@@ -241,8 +251,9 @@ export class SyncWorker {
 
   /** Rounds that are racing or due soon (hot), and upcoming ones whose start lists may change. */
   private async roundsToPoll(eventId: number, now: number) {
-    const res = await this.pool.query<{ id: number; isu_id: number; comp_isu_id: number; is_relay: boolean; hot: boolean }>(
+    const res = await this.pool.query<PollRound>(
       `select r.id, r.isu_id, c.isu_id as comp_isu_id, c.is_relay,
+         exists (select 1 from heat h where h.round_id = r.id and h.state = 'running') as running,
          (r.state = 'live'
            or exists (select 1 from heat h where h.round_id = r.id and h.state in ('running', 'unofficial'))
            or exists (select 1 from schedule_item si where si.round_id = r.id
@@ -253,11 +264,21 @@ export class SyncWorker {
          and (r.state = 'live' or r.starts_at is null or r.starts_at < $2::timestamptz + interval '24 hours')`,
       [eventId, new Date(now).toISOString(), HOT_WINDOW / 1000]);
     // Finished rounds whose heats aren't all official yet still need polling.
-    const pending = await this.pool.query<{ id: number; isu_id: number; comp_isu_id: number; is_relay: boolean }>(
+    const pending = await this.pool.query<Omit<PollRound, 'hot' | 'running'>>(
       `select distinct r.id, r.isu_id, c.isu_id as comp_isu_id, c.is_relay
        from round r join competition c on c.id = r.competition_id join heat h on h.round_id = r.id
        where c.event_id = $1 and r.state = 'finished' and h.state <> 'official'`, [eventId]);
-    return [...res.rows, ...pending.rows.map((r) => ({ ...r, hot: true }))];
+    return [...res.rows, ...pending.rows.map((r) => ({ ...r, hot: true, running: false }))];
+  }
+
+  private async pollRounds(rounds: PollRound[], now: number): Promise<void> {
+    for (const r of rounds) {
+      const every = r.hot ? HOT_HEATS_EVERY : START_LISTS_EVERY;
+      if (now - (this.lastHeats.get(r.id) ?? 0) < every) continue;
+      this.lastHeats.set(r.id, now);
+      const heats = await this.isu.heats(r.comp_isu_id, r.isu_id, r.is_relay);
+      await this.ingest.loadRoundHeats(r.isu_id, heats, r.is_relay);
+    }
   }
 
   /** A full, fresh pull of an event that has just ended (then daily until it settles). */
