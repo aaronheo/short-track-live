@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { list, medalNote, ordinal, result, upNext, type AlertRace } from '../src/domain/alerts.js';
 import { shortCountry, statusCode } from '../src/domain/codes.js';
-import { distanceLabel, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
+import { cleanCity, distanceLabel, eventNames, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/picks.js';
@@ -63,6 +63,35 @@ describe('normalize', () => {
     expect(shortEventName('ISU Short Track World Tour #1')).toBe('World Tour #1');
     expect(shortEventName('ISU CNSG Short Track World Championships')).toBe('World Championships');
     expect(shortEventName('Olympic Winter Games 2026 Short Track Speed Skating')).toBe('Olympic Winter Games 2026');
+  });
+
+  it("names a season's events, numbering stops in date order", () => {
+    expect(eventNames([
+      { name: 'ISU World Cup 2019/20 - Salt Lake City (USA)', series: 'ISU World Cup' },
+      { name: 'ISU World Cup  2019/20 - Montreal (CAN)', series: 'ISU World Cup' },
+      { name: 'ISU Four Continents Short Track Championships 2020 - Montreal', series: 'Four Continents Championships' },
+      { name: 'ISU World Junior Short Track Championships 2020 - Bormio (ITA)', series: 'World Junior Championships' },
+      { name: 'ISU World Cup Short Track Speed Skating', series: 'ISU World Cup' },
+      { name: 'KB Financial Group ISU World Short Track Speed Skating Championships', series: 'World Championships' },
+    ])).toEqual(['World Cup #1', 'World Cup #2', 'Four Continents Championships', 'Junior World Championships', 'World Cup #3', 'World Championships']);
+    // 2024/25: World Tour names under the World Cup series; later seasons number them.
+    expect(eventNames([
+      { name: 'ISU Short Track World Tour', series: 'ISU World Cup' },
+      { name: 'ISU Short Track World Tour', series: 'ISU World Cup' },
+    ])).toEqual(['World Tour #1', 'World Tour #2']);
+    expect(eventNames([
+      { name: 'ISU Short Track Junior World Cup #1', series: 'ISU Junior World Cup' },
+      { name: 'ISU Short Track World Tour #3', series: 'ISU World Tour' },
+      { name: 'Olympic Winter Games 2026 Short Track Speed Skating', series: 'Olympic Games' },
+    ])).toEqual(['Junior World Cup #1', 'World Tour #3', 'Olympic Winter Games 2026']);
+  });
+
+  it('cleans ISU city names', () => {
+    expect(cleanCity('Salt Lake City, Utah Olympic Oval')).toBe('Salt Lake City');
+    expect(cleanCity('Dordrech, Sportboulevard')).toBe('Dordrecht');
+    expect(cleanCity('Montreal')).toBe('Montréal');
+    expect(cleanCity('Laval, QC')).toBe('Laval');
+    expect(cleanCity('')).toBeNull();
   });
 
   it('shortens formal country names for relay teams', () => {

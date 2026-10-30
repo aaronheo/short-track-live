@@ -41,6 +41,45 @@ export function gap(ms: number | null | undefined): string | null {
  * "ISU CNSG Short Track World Championships" → "World Championships" (drops sponsors),
  * "Olympic Winter Games 2026 Short Track Speed Skating" → "Olympic Winter Games 2026".
  */
+/** Event kinds that count their stops in a season ("World Cup #3"). */
+const SERIES = ['Junior World Cup', 'World Tour', 'World Cup'] as const;
+
+/** Championships named by ISU's series, whatever the event's own (sponsored, dated) name says. */
+const CHAMPIONSHIPS: Record<string, string> = {
+  'World Championships': 'World Championships',
+  'European Championships': 'European Championships',
+  'Four Continents Championships': 'Four Continents Championships',
+  'World Junior Championships': 'Junior World Championships',
+};
+
+/**
+ * Names for one season's events, in date order: "World Cup #3", "World Tour #1",
+ * "European Championships". ISU's older names are "ISU World Cup 2019/20 -
+ * Salt Lake City (USA)" or just "ISU World Cup Short Track Speed Skating", so
+ * stops are numbered by their order in the season unless the name has "#n".
+ */
+export function eventNames(events: { name: string; series: string | null }[]): string[] {
+  const counts = new Map<string, number>();
+  return events.map(({ name, series }) => {
+    const kind = SERIES.find((k) => name.includes(k) || (k !== 'World Tour' && series?.includes(k)));
+    if (kind) {
+      const n = (counts.get(kind) ?? 0) + 1;
+      counts.set(kind, n);
+      return `${kind} #${/#(\d+)/.exec(name)?.[1] ?? n}`;
+    }
+    return CHAMPIONSHIPS[series ?? ''] ?? shortEventName(name);
+  });
+}
+
+/** ISU's city, without the arena ("Salt Lake City, Utah Olympic Oval") and with a few fixes. */
+export function cleanCity(city: string | null | undefined): string | null {
+  const first = city?.split(',')[0]?.trim();
+  if (!first) return null;
+  return CITY_FIXES[first.toLowerCase()] ?? first;
+}
+
+const CITY_FIXES: Record<string, string> = { dordrech: 'Dordrecht', montreal: 'Montréal' };
+
 export function shortEventName(name: string): string {
   const short = name
     .replace(/\bShort Track( Speed Skating)?\b/gi, '')

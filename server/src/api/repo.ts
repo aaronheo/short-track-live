@@ -3,7 +3,7 @@ import type { Db } from '../db/pool.js';
 // SQL for the app API. Each function returns plain rows; views.ts shapes them.
 
 export interface EventRow {
-  id: number; slug: string; name: string; series: string | null; city: string | null;
+  id: number; slug: string; name: string; short_name: string | null; series: string | null; city: string | null;
   country_name: string | null; iso2: string | null; time_zone: string;
   starts_on: string; ends_on: string; state: 'upcoming' | 'live' | 'finished';
 }
@@ -66,7 +66,7 @@ export class Repo {
 
   async events(seasonTitle: string): Promise<EventRow[]> {
     const res = await this.db.query<EventRow>(
-      `select e.id, e.slug, e.name, e.series, e.city, n.name as country_name, n.iso2, e.time_zone,
+      `select e.id, e.slug, e.name, e.short_name, e.series, e.city, n.name as country_name, n.iso2, e.time_zone,
          to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on, e.state
        from event e join season s on s.id = e.season_id left join nation n on n.code = e.country_code
        where s.title = $1
@@ -79,7 +79,7 @@ export class Repo {
 
   async event(slug: string): Promise<EventRow | null> {
     const res = await this.db.query<EventRow>(
-      `select e.id, e.slug, e.name, e.series, e.city, n.name as country_name, n.iso2, e.time_zone,
+      `select e.id, e.slug, e.name, e.short_name, e.series, e.city, n.name as country_name, n.iso2, e.time_zone,
          to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on, e.state
        from event e left join nation n on n.code = e.country_code where e.slug = $1 and not e.no_results`, [slug]);
     return res.rows[0] ?? null;
@@ -100,7 +100,7 @@ export class Repo {
     const res = await this.db.query<RoundRow>(
       `select r.id, r.name, r.display_order, r.state, r.starts_at, r.auto_places, r.time_spots, r.time_place,
          r.destination, r.qualification_rule, c.id as competition_id, c.name as competition, c.distance_m, c.is_relay,
-         e.id as event_id, e.slug as event_slug, e.name as event_name, e.time_zone
+         e.id as event_id, e.slug as event_slug, coalesce(e.short_name, e.name) as event_name, e.time_zone
        from round r join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where r.id = $1`, [id]);
     return res.rows[0] ?? null;

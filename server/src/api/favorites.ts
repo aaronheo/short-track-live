@@ -74,7 +74,7 @@ export class Favorites {
            and pc.name = c.name and ph.starts_at between h.starts_at - interval '1 year' and h.starts_at)
        select h.id as heat_id, h.round_id, h.name as heat, h.state, h.starts_at,
          r.name as round, r.destination, c.name as competition, c.distance_m, c.is_relay,
-         e.slug, e.name as event_name, e.city,
+         e.slug, coalesce(e.short_name, e.name) as event_name, e.city,
          en.id as entry_id, t.name as team, m.named, s.id as skater_id, s.first_name, s.last_name,
          en.rank, en.time_text, en.status, en.qualification
        from mine m
@@ -139,7 +139,7 @@ export class Favorites {
       rank: number; distance_m: number; event_name: string; helmet: number | null;
     }>(
       `with latest as (
-         select e.id, e.name from event e
+         select e.id, coalesce(e.short_name, e.name) as name from event e
          where exists (select 1 from competition c join round r on r.competition_id = c.id join heat h on h.round_id = r.id
                        join entry en on en.heat_id = h.id
                        where c.event_id = e.id and h.state = 'official' and ${FINAL})

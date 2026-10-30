@@ -21,7 +21,7 @@ const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) ? v : 
 
 const SCHEMA = `Tables (Postgres):
 - season(id, title)  -- title like '2025/2026'
-- event(id, slug, name, series, city, country_code, starts_on date, ends_on date, season_id, state)  -- junior events have 'Junior' in name
+- event(id, slug, name, short_name, series, city, country_code, starts_on date, ends_on date, season_id, state)  -- junior events have 'Junior' in name; short_name is how to call an event (World Cup #3, World Tour #1, European Championships)
 - competition(id, event_id, name, gender ['Men','Women','Mixed'], distance_m, is_relay)  -- e.g. 'Men 500 m', "Women's 1000m" (Olympics)
 - round(id, competition_id, name, starts_at)  -- 'Heats', 'Quarterfinals', 'Semifinals', 'Finals', 'Rep. Heats', ...
 - heat(id, round_id, name, starts_at, state)  -- name 'Heat 3', 'Final A', 'Final B', 'Final' (single final), 'Semifinal 2' (Olympics)
@@ -163,12 +163,12 @@ export class ChatTools {
   private async listEvents(args: Args): Promise<ToolResult> {
     const season = str(args.season);
     const res = await this.pool.query(
-      `select e.slug, e.name, e.series, e.city, n.name as country, to_char(e.starts_on, 'YYYY-MM-DD') as starts_on,
+      `select e.slug, e.name, e.short_name, e.series, e.city, n.name as country, to_char(e.starts_on, 'YYYY-MM-DD') as starts_on,
          to_char(e.ends_on, 'YYYY-MM-DD') as ends_on, e.state, s.title as season
        from event e join season s on s.id = e.season_id left join nation n on n.code = e.country_code
        where $1::text is null or s.title = $1 order by e.starts_on`, [season]);
     return {
-      data: res.rows.map((r) => ({ ...r, shortName: shortEventName(r.name) })),
+      data: res.rows.map(({ short_name: short, ...r }) => ({ ...r, shortName: short ?? shortEventName(r.name) })),
       step: season ? `Looked up the ${season} events` : 'Looked up the events',
     };
   }
@@ -179,7 +179,7 @@ export class ChatTools {
       event: string; competition: string; heat_id: number; heat: string; rank: number | null; name: string;
       athlete_id: number | null; nation: string | null; time_text: string | null; status: string | null;
     }>(
-      `select e.name as event, c.name as competition, h.id as heat_id, h.name as heat, en.rank,
+      `select coalesce(e.short_name, e.name) as event, c.name as competition, h.id as heat_id, h.name as heat, en.rank,
          coalesce(s.first_name || ' ' || s.last_name, s.last_name, t.name) as name, s.id as athlete_id,
          en.nation, en.time_text, en.status
        from event e join competition c on c.event_id = e.id join round r on r.competition_id = c.id

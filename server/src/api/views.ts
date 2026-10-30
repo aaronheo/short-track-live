@@ -70,7 +70,7 @@ const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 export function eventSummary(e: EventRow): EventSummary {
   return {
-    slug: e.slug, name: e.name, shortName: shortEventName(e.name), series: e.series, city: e.city, countryName: e.country_name, iso2: e.iso2,
+    slug: e.slug, name: e.name, shortName: e.short_name ?? shortEventName(e.name), series: e.series, city: e.city, countryName: e.country_name, iso2: e.iso2,
     startsOn: e.starts_on, endsOn: e.ends_on, state: e.state,
   };
 }

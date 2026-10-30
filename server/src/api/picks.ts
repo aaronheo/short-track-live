@@ -81,7 +81,7 @@ export class Picks {
       'select nickname from account where id = $1', [accountId])).rows[0]?.nickname ?? null : null;
     // The live event; else one that ended in the last 3 days (for scores); else the next one.
     const event = (await this.db.query<{ id: number; slug: string; name: string; city: string | null; state: string }>(
-      `select e.id, e.slug, e.name, e.city, e.state from event e
+      `select e.id, e.slug, coalesce(e.short_name, e.name) as name, e.city, e.state from event e
        where exists (select 1 from competition c join round r on r.competition_id = c.id where c.event_id = e.id and r.name = any($2))
        order by (e.state = 'live') desc,
          (e.ends_on between $1::date - 3 and $1::date) desc,
@@ -97,7 +97,7 @@ export class Picks {
 
     const heats = (await this.db.query<HeatRow & { entries: number }>(
       `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
-         c.event_id, e.name as event_name, e.city, e.time_zone, (select count(*) from entry en where en.heat_id = h.id)::int as entries
+         c.event_id, coalesce(e.short_name, e.name) as event_name, e.city, e.time_zone, (select count(*) from entry en where en.heat_id = h.id)::int as entries
        from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where c.event_id = $1 and r.name = any($2)
        order by h.starts_at nulls last, h.run_order nulls last, h.id`, [event.id, PICKABLE_ROUNDS])).rows;
@@ -214,7 +214,7 @@ export class Picks {
   private async heatRow(heatId: number): Promise<HeatRow | null> {
     return (await this.db.query<HeatRow>(
       `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
-         c.event_id, e.name as event_name, e.city, e.time_zone
+         c.event_id, coalesce(e.short_name, e.name) as event_name, e.city, e.time_zone
        from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where h.id = $1 and r.name = any($2)`, [heatId, PICKABLE_ROUNDS])).rows[0] ?? null;
   }

@@ -55,7 +55,7 @@ const MINE = `
   select en.id as entry_id, en.rank, en.time_text, en.time_ms, en.qualification, en.status,
     h.id as heat_id, h.name as heat, h.state as heat_state, coalesce(h.starts_at, e.starts_on::timestamptz) as at, h.starts_at,
     r.id as round_id, r.name as round, c.name as competition, c.distance_m, c.is_relay,
-    e.slug, e.name as event_name, e.city, e.time_zone,
+    e.slug, coalesce(e.short_name, e.name) as event_name, e.city, e.time_zone,
     to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on,
     se.title as season, t.name as team
   from entry en

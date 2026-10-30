@@ -97,7 +97,7 @@ export class Standings {
     // column's country, nearest its date, or by
     // order for the stops still to come (no date yet).
     const tour = (await this.db.query<{ slug: string; name: string; city: string | null; country_code: string | null; starts_on: string; ends_on: string }>(
-      `select slug, name, city, country_code, starts_on::text, ends_on::text from event
+      `select slug, coalesce(short_name, name) as name, city, country_code, starts_on::text, ends_on::text from event
        where season_id = $1 and series in ('ISU World Tour', 'ISU World Cup') order by starts_on, id`,
       [season.id])).rows;
     type Stop = StandingsResponse['events'][number] & { key: string; sort: string };

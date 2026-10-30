@@ -2,6 +2,7 @@ import type { Db } from './pool.js';
 import { isRelay } from '../isu/client.js';
 import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSkater } from '../isu/types.js';
 import { iso2, shortCountry } from '../domain/codes.js';
+import { cleanCity, eventNames } from '../domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName, type Entry } from '../domain/normalize.js';
 import { parseRule } from '../domain/rules.js';
 import { heatTimes, isuLocalDate, utc, venueTimeZone } from '../domain/time.js';
@@ -110,7 +111,8 @@ export class Ingest {
       [['isu_id', 'int'], ['title', 'text'], ['starts_on', 'date'], ['ends_on', 'date']],
       [{ isu_id: Number(ev.season_id), title: ev.season, starts_on: `${first}-07-01`, ends_on: `${first + 1}-06-30` }]);
     await this.nations([[ev.country_code, ev.country_name]]);
-    const timeZone = venueTimeZone(ev.city, ev.country_code, ev.time_zone);
+    const city = cleanCity(ev.city);
+    const timeZone = venueTimeZone(city, ev.country_code, ev.time_zone);
     const ids = await upsertMany(this.db, 'event', [
       ['isu_id', 'int'], ['api_id', 'uuid'], ['slug', 'text'], ['season_id', 'smallint'], ['name', 'text'],
       ['series', 'text'], ['city', 'text'], ['country_code', 'text'], ['time_zone', 'text'],
@@ -118,10 +120,21 @@ export class Ingest {
     ], [{
       isu_id: Number(ev.event_id ?? ev.id), api_id: ev.api_id || null, slug: ev.slug,
       season_id: seasonIds.get(Number(ev.season_id)), name: EVENT_NAMES[Number(ev.event_id ?? ev.id)] ?? ev.name, series: ev.event_sub_type_name ?? null,
-      city: ev.city ?? null, country_code: ev.country_code || null, time_zone: timeZone,
+      city, country_code: ev.country_code || null, time_zone: timeZone,
       starts_on: isuLocalDate(ev.from_date), ends_on: isuLocalDate(ev.to_date), state: eventState(ev.state),
     }]);
+    await this.nameSeason(seasonIds.get(Number(ev.season_id))!);
     return { eventId: [...ids.values()][0]!, timeZone };
+  }
+
+  /** short_name for every event in a season (stops are numbered in date order). */
+  async nameSeason(seasonId: number): Promise<void> {
+    const events = (await this.db.query<{ id: number; name: string; series: string | null }>(
+      'select id, name, series from event where season_id = $1 order by starts_on, id', [seasonId])).rows;
+    const names = eventNames(events);
+    await this.db.query(
+      `update event e set short_name = x.name from unnest($1::int[], $2::text[]) as x(id, name)
+       where e.id = x.id and e.short_name is distinct from x.name`, [events.map((e) => e.id), names]);
   }
 
   async upsertCompetition(eventId: number, comp: IsuCompetition): Promise<number> {
