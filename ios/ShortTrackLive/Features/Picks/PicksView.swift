@@ -45,6 +45,7 @@ struct PicksTab: View {
 // MARK: - Home
 
 private struct PicksHomeView: View {
+    @AppStorage(RaceTimes.key) private var venueTime = true
     let split: Bool
     @Binding var selected: Int?
     let open: (Int) -> Void
@@ -195,7 +196,7 @@ private struct PicksHomeView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(race.title).font(.callout.weight(.semibold)).foregroundStyle(Theme.ink)
-                            Text([race.race, race.startsAt.map(startsText)].compactMap { $0 }.joined(separator: " · "))
+                            Text([race.race, race.startsAt.map { startsText($0, venue: race.timeZone) }].compactMap { $0 }.joined(separator: " · "))
                                 .font(.footnote).foregroundStyle(Theme.muted)
                         }
                         Spacer(minLength: 8)
@@ -212,10 +213,11 @@ private struct PicksHomeView: View {
         }
     }
 
-    private func startsText(_ date: Date) -> String {
+    /// "in 12 min", else "Fri 30 09:54 ET" in the times chosen in Profile.
+    private func startsText(_ date: Date, venue: String?) -> String {
         date.timeIntervalSinceNow > 0 && date.timeIntervalSinceNow < 3600
             ? "in \(Int(date.timeIntervalSinceNow / 60) + 1) min"
-            : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+            : Fmt.dayLabel(date, in: RaceTimes.zone(venue: venue, venueTime: venueTime)) + " " + RaceTimes.clock(date, venue: venue, venueTime: venueTime)
     }
 
     @ViewBuilder

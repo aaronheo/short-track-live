@@ -14,6 +14,7 @@ export interface PickSummary {
   race: string; // "Semifinal · Heat 2", "Final A"
   round: string; // "Semifinals": picks-open alerts come one per round
   startsAt: string | null;
+  timeZone: string; // the venue's, for showing startsAt
   state: HeatState;
   picked: boolean;
   /** Once official. */
@@ -63,7 +64,7 @@ export type SaveResult = PickHeatView | 'not_found' | 'locked' | 'invalid' | 'ne
 
 interface HeatRow {
   id: number; name: string; state: HeatState; starts_at: Date | null; round: string; auto_places: number | null; destination: string | null;
-  competition: string; event_id: number; event_name: string; city: string | null;
+  competition: string; event_id: number; event_name: string; city: string | null; time_zone: string;
 }
 
 const OPEN: HeatState[] = ['scheduled', 'start_list'];
@@ -96,7 +97,7 @@ export class Picks {
 
     const heats = (await this.db.query<HeatRow & { entries: number }>(
       `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
-         c.event_id, e.name as event_name, e.city, (select count(*) from entry en where en.heat_id = h.id)::int as entries
+         c.event_id, e.name as event_name, e.city, e.time_zone, (select count(*) from entry en where en.heat_id = h.id)::int as entries
        from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where c.event_id = $1 and r.name = any($2)
        order by h.starts_at nulls last, h.run_order nulls last, h.id`, [event.id, PICKABLE_ROUNDS])).rows;
@@ -105,7 +106,7 @@ export class Picks {
     const summary = (h: HeatRow): PickSummary => {
       const s = mine.get(h.id);
       return {
-        heatId: h.id, ...summaryTitle(h), round: h.round, startsAt: h.starts_at?.toISOString() ?? null, state: h.state,
+        heatId: h.id, ...summaryTitle(h), round: h.round, startsAt: h.starts_at?.toISOString() ?? null, timeZone: h.time_zone, state: h.state,
         picked: !!s, points: s?.score?.points ?? null, max: s?.score?.max ?? null,
       };
     };
@@ -213,7 +214,7 @@ export class Picks {
   private async heatRow(heatId: number): Promise<HeatRow | null> {
     return (await this.db.query<HeatRow>(
       `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
-         c.event_id, e.name as event_name, e.city
+         c.event_id, e.name as event_name, e.city, e.time_zone
        from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where h.id = $1 and r.name = any($2)`, [heatId, PICKABLE_ROUNDS])).rows[0] ?? null;
   }

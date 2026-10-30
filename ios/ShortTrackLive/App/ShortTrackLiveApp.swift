@@ -34,6 +34,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var phase
     @State private var split = false
     @AppStorage("appearance") private var appearance = Appearance.system
+    @AppStorage(RaceTimes.key) private var venueTime = true
 
     var body: some View {
         TabView(selection: $model.tab) {
@@ -87,6 +88,7 @@ struct RootView: View {
         .onChange(of: favorites.notifyPicks) { Task { await RaceAlerts.shared.check(favorites) } }
         .onChange(of: account.signedIn) { Task { await RaceAlerts.shared.check(favorites) } }
         .onChange(of: appearance) { account.localChanged() }
+        .onChange(of: venueTime) { account.localChanged() }
     }
 }
 
@@ -94,6 +96,9 @@ struct RootView: View {
 /// up or reach the top. Put on each screen's scroll view.
 /// Not when the bar is fixed (AppModel.tabBarFixed): wide screens and the
 /// Duo's cover screen, where it's out of the way already.
+/// On the cover screen the navigation bar's buttons sit in the side column
+/// too, so the top gets no bar background or edge effect: they drew an empty
+/// strip across the top of the content.
 struct TabBarHidesOnScroll: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var hidden = false
@@ -105,6 +110,7 @@ struct TabBarHidesOnScroll: ViewModifier {
                 if next != hidden { withAnimation(.snappy) { hidden = next } }
             }
             .onChange(of: model.tabBarFixed) { if model.tabBarFixed { hidden = false } }
+            .modifier(SideBarTop(atSide: model.tabBarAtSide))
             // .automatic, not .visible: a root screen saying .visible would
             // keep the bar up over a pushed screen that hides it (Ask).
             .toolbarVisibility(hidden ? .hidden : .automatic, for: .tabBar)
@@ -113,6 +119,21 @@ struct TabBarHidesOnScroll: ViewModifier {
 
 extension View {
     func tabBarHidesOnScroll() -> some View { modifier(TabBarHidesOnScroll()) }
+}
+
+/// No navigation bar background or top scroll edge effect when the bars are in a side column.
+private struct SideBarTop: ViewModifier {
+    let atSide: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content
+                .toolbarBackgroundVisibility(atSide ? .hidden : .automatic, for: .navigationBar)
+                .scrollEdgeEffectHidden(atSide, for: .top)
+        } else {
+            content.toolbarBackgroundVisibility(atSide ? .hidden : .automatic, for: .navigationBar)
+        }
+    }
 }
 
 private struct StackLayout: View {
@@ -190,10 +211,21 @@ extension EnvironmentValues {
 /// the next screen's back button reads "Schedule", "Quarterfinals" etc.
 extension View {
     func screen(title: String) -> some View {
-        background(Theme.ground)
+        modifier(Screen(title: title))
+    }
+}
+
+private struct Screen: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let title: String
+
+    func body(content: Content) -> some View {
+        content
+            .background(Theme.ground)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(removing: .title)
             .toolbarBackground(Theme.ground, for: .navigationBar)
+            .modifier(SideBarTop(atSide: model.tabBarAtSide))
     }
 }

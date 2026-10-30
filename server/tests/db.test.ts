@@ -372,11 +372,11 @@ describe.skipIf(!url)('database + API', () => {
           { id: sarault, addedAt: '2026-10-21T10:00:00Z' },
           { id: 999_999_999, addedAt: '2026-10-21T10:00:00Z' }, // not a skater: left out
         ],
-        settings: { notifyStarts: false, notifyResults: true, notifyPicks: false, appearance: 'dark', extra: 'dropped' },
+        settings: { notifyStarts: false, notifyResults: true, notifyPicks: false, appearance: 'dark', venueTime: false, extra: 'dropped' },
       }).expect(200);
       expect(put.body.favorites.map((f: { last: string }) => f.last)).toEqual(['Velzeboer', 'Sarault']);
       expect(put.body.favorites[0]).toMatchObject({ id: velzeboer, name: 'Xandra Velzeboer', nat: 'NED', iso2: 'NL', gender: 'Women', addedAt: '2026-10-20T10:00:00.000Z' });
-      expect(put.body.settings).toEqual({ notifyStarts: false, notifyResults: true, notifyPicks: false, appearance: 'dark' });
+      expect(put.body.settings).toEqual({ notifyStarts: false, notifyResults: true, notifyPicks: false, appearance: 'dark', venueTime: false });
       await request(api).put('/me').set('X-Session', session).send({ favorites: [{ id: 'x' }] }).expect(400);
 
       // Signing in on another phone finds the same account; removing a favorite there sticks.
@@ -459,6 +459,7 @@ describe.skipIf(!url)('database + API', () => {
       expect(home.mine.map((m: { heatId: number }) => m.heatId)).toEqual([id]);
       expect(home.open.length).toBeGreaterThan(0);
       expect(['Quarterfinals', 'Semifinals', 'Finals']).toContain(home.open[0].round);
+      expect(home.open[0].timeZone).toBe('America/Vancouver');
     });
 
     it('locks once the race is raced, and scores it when official', async () => {

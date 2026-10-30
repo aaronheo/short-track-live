@@ -20,6 +20,7 @@ struct ProfileView: View {
     @Environment(Favorites.self) private var favorites
     @Environment(AccountStore.self) private var account
     @AppStorage("appearance") private var appearance = Appearance.system
+    @AppStorage(RaceTimes.key) private var venueTime = true
     @Environment(\.colorScheme) private var scheme
     @Environment(\.scenePhase) private var phase
     @State private var path: [Route] = []
@@ -40,6 +41,7 @@ struct ProfileView: View {
                     }
                     favoritesSection
                     notificationsSection
+                    timesSection
                     appearanceSection
                     section("About") {
                         VStack(spacing: 0) {
@@ -184,6 +186,42 @@ struct ProfileView: View {
         favorites.askedAboutNotifications = true
         permission = await RaceAlerts.shared.status()
         await RaceAlerts.shared.check()
+    }
+
+    // MARK: Race times
+
+    /// Venue or my time, for every race time in the app.
+    private var timesSection: some View {
+        section("Race times") {
+            VStack(spacing: 0) {
+                timeChoice(true, title: "Venue time", note: "As the clock reads at the rink")
+                RowDivider(leading: 16)
+                timeChoice(false, title: "My time", note: "Your iPhone’s time zone, \(Fmt.zoneName(.current))")
+            }
+        }
+        .sensoryFeedback(.selection, trigger: venueTime)
+    }
+
+    private func timeChoice(_ venue: Bool, title: String, note: String) -> some View {
+        Button {
+            venueTime = venue
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.callout.weight(.medium)).foregroundStyle(Theme.ink)
+                    Text(note).font(.footnote).foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 8)
+                if venueTime == venue {
+                    Image(systemName: "checkmark").font(.body.weight(.semibold)).foregroundStyle(Theme.link)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 60)
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle())
+        .accessibilityAddTraits(venueTime == venue ? .isSelected : [])
     }
 
     // MARK: Appearance

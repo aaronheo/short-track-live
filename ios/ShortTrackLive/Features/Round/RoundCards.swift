@@ -406,7 +406,8 @@ struct StartListCard: View {
     @Environment(AppModel.self) private var model
     let heat: HeatBlock
     let upNext: Bool
-    let zone: TimeZone
+    let venue: String
+    @AppStorage(RaceTimes.key) private var venueTime = true
     @State private var width: CGFloat = 0
 
     var body: some View {
@@ -460,7 +461,7 @@ struct StartListCard: View {
     }
 
     private var label: String {
-        let list = heat.state == .startList ? "Start list" : heat.startsAt.map { Fmt.clock($0, in: zone) } ?? "Scheduled"
+        let list = heat.state == .startList ? "Start list" : heat.startsAt.map { RaceTimes.clock($0, venue: venue, venueTime: venueTime) } ?? "Scheduled"
         return upNext ? "Up next · \(list)" : list
     }
 }

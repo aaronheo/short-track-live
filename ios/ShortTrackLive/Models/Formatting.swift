@@ -108,3 +108,27 @@ enum Fmt {
         return "\(range), \(year)"
     }
 }
+
+/// Race times everywhere: the venue's clock or the iPhone's, chosen in Profile.
+enum RaceTimes {
+    /// @AppStorage key; true is venue time. (First set on the Schedule, hence the name.)
+    static let key = "scheduleInVenueTime"
+
+    /// The zone to show an event's times in.
+    static func zone(venue: String?, venueTime: Bool) -> TimeZone {
+        guard venueTime, let venue, let zone = TimeZone(identifier: venue) else { return .current }
+        return zone
+    }
+
+    /// True when the venue's clock and the iPhone's differ at `date`, so a time needs its zone named.
+    static func differs(venue: String?, at date: Date = .now) -> Bool {
+        guard let venue, let zone = TimeZone(identifier: venue) else { return false }
+        return zone.secondsFromGMT(for: date) != TimeZone.current.secondsFromGMT(for: date)
+    }
+
+    /// "09:54", plus " ET" when the venue's clock and the iPhone's differ.
+    static func clock(_ date: Date, venue: String?, venueTime: Bool) -> String {
+        let zone = zone(venue: venue, venueTime: venueTime)
+        return Fmt.clock(date, in: zone) + (differs(venue: venue, at: date) ? " \(Fmt.zoneName(zone, at: date))" : "")
+    }
+}

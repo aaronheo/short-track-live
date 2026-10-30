@@ -390,17 +390,14 @@ private struct EventGroup: View {
 
 private struct RaceRow: View {
     let race: AthleteRace
-    @AppStorage("scheduleInVenueTime") private var venueTime = true
+    @AppStorage(RaceTimes.key) private var venueTime = true
 
-    /// An upcoming race's start: venue or my time, as on the Schedule.
+    /// An upcoming race's start, in the times chosen in Profile ("09:54 ET").
     private var start: (clock: String, day: String)? {
         guard race.upcoming, let at = race.startTime else { return nil }
-        let venue = race.event.timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
-        let zone = venueTime ? venue : .current
-        // The zone's name only when venue and phone clocks differ ("09:54 ET").
-        let sameClock = venue.secondsFromGMT(for: at) == TimeZone.current.secondsFromGMT(for: at)
-        let clock = Fmt.clock(at, in: zone) + (sameClock ? "" : " \(Fmt.zoneName(zone, at: at))")
-        return (clock, Fmt.weekdayMonthDay(at, in: zone))
+        let venue = race.event.timeZone
+        return (RaceTimes.clock(at, venue: venue, venueTime: venueTime),
+                Fmt.weekdayMonthDay(at, in: RaceTimes.zone(venue: venue, venueTime: venueTime)))
     }
 
     var body: some View {

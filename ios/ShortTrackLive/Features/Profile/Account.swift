@@ -15,6 +15,7 @@ struct AccountSettings: Codable, Equatable, Sendable {
     var notifyResults: Bool?
     var notifyPicks: Bool?
     var appearance: String?
+    var venueTime: Bool?
 }
 
 /// What's saved in an account: GET /me, PUT /me, and the sign-in reply (with `session`).
@@ -194,13 +195,15 @@ final class AccountStore {
         if let on = state.settings.notifyResults { favorites.notifyResults = on }
         if let on = state.settings.notifyPicks { favorites.notifyPicks = on }
         if let mode = state.settings.appearance { defaults.set(mode, forKey: "appearance") }
+        if let venue = state.settings.venueTime { defaults.set(venue, forKey: RaceTimes.key) }
     }
 
     /// This iPhone's favorites and settings.
     private var current: SavedState {
         SavedState(skaters: favorites.skaters, settings: AccountSettings(
             notifyStarts: favorites.notifyStarts, notifyResults: favorites.notifyResults, notifyPicks: favorites.notifyPicks,
-            appearance: defaults.string(forKey: "appearance") ?? "system"))
+            appearance: defaults.string(forKey: "appearance") ?? "system",
+            venueTime: defaults.object(forKey: RaceTimes.key) as? Bool ?? true))
     }
 
     /// The account's favorites that aren't on this iPhone yet.

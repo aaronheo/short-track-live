@@ -71,7 +71,7 @@ struct RoundView: View {
 private struct RoundHeader: View {
     let data: RoundResponse
     let pick: (Int) -> Void
-    @AppStorage("scheduleInVenueTime") private var venueTime = true
+    @AppStorage(RaceTimes.key) private var venueTime = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -92,10 +92,9 @@ private struct RoundHeader: View {
         }
     }
 
-    /// "Quarterfinals · Fri 23 · 16:41 PT", in venue time or the phone's, as chosen on the schedule.
+    /// "Quarterfinals · Fri 23 · 16:41 PT", in the times chosen in Profile.
     private var subtitle: String {
-        let venue = TimeZone(identifier: data.event.timeZone) ?? .current
-        let zone = venueTime ? venue : .current
+        let zone = RaceTimes.zone(venue: data.event.timeZone, venueTime: venueTime)
         var parts = [data.round.name]
         if let start = data.round.startsAt {
             parts.append(Fmt.dayLabel(start, in: zone))
@@ -220,7 +219,7 @@ private struct RoundBody: View {
             LiveHeatCard(heat: running, updatedAt: updatedAt)
         }
         ForEach(Array(waiting.enumerated()), id: \.element.id) { index, heat in
-            StartListCard(heat: heat, upNext: index == 0, zone: TimeZone(identifier: data.event.timeZone) ?? .current)
+            StartListCard(heat: heat, upNext: index == 0, venue: data.event.timeZone)
         }
     }
 }

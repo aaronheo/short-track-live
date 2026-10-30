@@ -24,6 +24,8 @@ struct PickSummary: Decodable, Sendable, Hashable, Identifiable {
     let race: String // "Semifinal · Heat 2", "Final A"
     let round: String? // "Semifinals"
     let startsAt: Date?
+    /// The venue's, for showing startsAt.
+    var timeZone: String? = nil
     let state: String // scheduled | start_list | running | unofficial | official
     let picked: Bool
     let points: Int?

@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// The event's running order by venue day. Tapping a race opens its round.
+/// The event's running order by day, in the times chosen in Profile. Tapping a race opens its round.
 struct ScheduleView: View {
     @Environment(AppModel.self) private var model
     @State private var live: Live<ScheduleResponse>
     @State private var day: String?
     @State private var showEarlier = false
-    @AppStorage("scheduleInVenueTime") private var venueTime = true
+    @AppStorage(RaceTimes.key) private var venueTime = true
 
     init(slug: String) {
         _live = State(initialValue: Live("events/\(slug)/schedule") { schedule in
@@ -16,10 +16,11 @@ struct ScheduleView: View {
 
     var body: some View {
         LiveContent(live: live) { data in
-            let zone = TimeZone(identifier: data.event.timeZone) ?? .current
-            let selected = data.days.first { $0.key == day } ?? defaultDay(data, zone: zone)
+            let zone = RaceTimes.zone(venue: data.event.timeZone, venueTime: venueTime)
+            let days = shownDays(data, zone: zone)
+            let selected = days.first { $0.key == day } ?? defaultDay(days, zone: zone)
             VStack(spacing: 0) {
-                header(data, selected: selected)
+                header(data, days: days, selected: selected)
                 ScrollViewReader { proxy in
                     ScrollView {
                         if let selected {
@@ -41,16 +42,6 @@ struct ScheduleView: View {
                     }
                 }
             }
-            .toolbar {
-                if #available(iOS 26, *) {
-                    // The segmented control is its own capsule; the bar's glass
-                    // behind it showed as a second outline.
-                    ToolbarItem(placement: .topBarTrailing) { zoneMenu(zone) }
-                        .sharedBackgroundVisibility(.hidden)
-                } else {
-                    ToolbarItem(placement: .topBarTrailing) { zoneMenu(zone) }
-                }
-            }
         }
         .screen(title: "Schedule")
         .task { await live.run() }
@@ -58,7 +49,7 @@ struct ScheduleView: View {
 
     // MARK: Header
 
-    private func header(_ data: ScheduleResponse, selected: ScheduleResponse.Day?) -> some View {
+    private func header(_ data: ScheduleResponse, days: [ScheduleResponse.Day], selected: ScheduleResponse.Day?) -> some View {
         let event = data.event.summary
         return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -66,12 +57,12 @@ struct ScheduleView: View {
                     .font(.condensed(.largeTitle))
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.ink)
-                Text([event.city, Fmt.dateRange(event.startsOn, event.endsOn)].compactMap { $0 }.joined(separator: " · "))
+                Text([event.city, Fmt.dateRange(event.startsOn, event.endsOn), zoneNote(data)].compactMap { $0 }.joined(separator: " · "))
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             }
-            if data.days.count > 1 {
-                DayTabs(days: data.days, selected: selected?.key) { key in
+            if days.count > 1 {
+                DayTabs(days: days, selected: selected?.key) { key in
                     withAnimation(.snappy) {
                         day = key
                         showEarlier = false
@@ -84,29 +75,38 @@ struct ScheduleView: View {
         .padding(.bottom, 14)
     }
 
-    /// Venue time or the phone's time, as a two-option toggle. Hidden when
-    /// they're the same.
-    @ViewBuilder
-    private func zoneMenu(_ zone: TimeZone) -> some View {
-        if zone.secondsFromGMT() != TimeZone.current.secondsFromGMT() {
-            Picker("Show times in", selection: $venueTime) {
-                Text("Venue · \(Fmt.zoneName(zone))").tag(true)
-                Text("My time · \(Fmt.zoneName(.current))").tag(false)
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .sensoryFeedback(.selection, trigger: venueTime)
-        }
+    /// "Times in ET" when the venue's clock and the iPhone's differ (which one is set in Profile).
+    private func zoneNote(_ data: ScheduleResponse) -> String? {
+        guard RaceTimes.differs(venue: data.event.timeZone) else { return nil }
+        return "Times in \(Fmt.zoneName(RaceTimes.zone(venue: data.event.timeZone, venueTime: venueTime)))"
     }
 
-    /// The live day, else today at the venue, else the first day.
-    private func defaultDay(_ data: ScheduleResponse, zone: TimeZone) -> ScheduleResponse.Day? {
-        if let live = data.days.first(where: \.live) { return live }
+    /// The server's days are venue days; in my time, races fall on my days.
+    private func shownDays(_ data: ScheduleResponse, zone: TimeZone) -> [ScheduleResponse.Day] {
+        guard zone.identifier != data.event.timeZone else { return data.days }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        var result: [ScheduleResponse.Day] = []
+        for item in data.days.flatMap(\.items) {
+            let c = calendar.dateComponents([.year, .month, .day], from: item.startsAt)
+            let key = String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
+            if let last = result.last, last.key == key {
+                result[result.count - 1] = .init(key: key, label: last.label, live: last.live || item.state == .live, items: last.items + [item])
+            } else {
+                result.append(.init(key: key, label: Fmt.dayLabel(item.startsAt, in: zone), live: item.state == .live, items: [item]))
+            }
+        }
+        return result
+    }
+
+    /// The live day, else today, else the first day.
+    private func defaultDay(_ days: [ScheduleResponse.Day], zone: TimeZone) -> ScheduleResponse.Day? {
+        if let live = days.first(where: \.live) { return live }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
         let c = calendar.dateComponents([.year, .month, .day], from: .now)
         let today = String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
-        return data.days.first { $0.key == today } ?? data.days.first
+        return days.first { $0.key == today } ?? days.first
     }
 
     // MARK: Rows
@@ -117,20 +117,20 @@ struct ScheduleView: View {
             // Sidebar: every race as a compact row, the open round highlighted.
             VStack(spacing: 2) {
                 ForEach(day.items) { item in
-                    SidebarRow(item: item, time: time(item)).id(item.id)
+                    SidebarRow(item: item, time: time(item, zone: zone)).id(item.id)
                 }
             }
         } else {
-            cardRows(day)
+            cardRows(day, zone: zone)
         }
     }
 
-    private func time(_ item: ScheduleItem) -> String {
-        venueTime ? item.venueTime : Fmt.clock(item.startsAt, in: .current)
+    private func time(_ item: ScheduleItem, zone: TimeZone) -> String {
+        Fmt.clock(item.startsAt, in: zone)
     }
 
     @ViewBuilder
-    private func cardRows(_ day: ScheduleResponse.Day) -> some View {
+    private func cardRows(_ day: ScheduleResponse.Day, zone: TimeZone) -> some View {
         // On the day that's racing, fold away all but the last three finished races.
         let firstOpen = day.items.firstIndex { $0.state != .finished } ?? day.items.count
         let isToday = day.live || (firstOpen > 0 && firstOpen < day.items.count)
@@ -156,7 +156,7 @@ struct ScheduleView: View {
             }
             ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
                 if index > 0 || hidden > 0 { RowDivider(leading: 76) }
-                ScheduleRow(item: item, time: time(item)).id(item.id)
+                ScheduleRow(item: item, time: time(item, zone: zone)).id(item.id)
             }
         }
         .card()
