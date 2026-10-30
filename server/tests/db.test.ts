@@ -116,6 +116,7 @@ describe.skipIf(!url)('database + API', () => {
     expect(body.results.map((r: { last: string }) => r.last)).toEqual(['Nadalini', 'Lee', 'Moon', 'Antonioli', 'Song', 'Bozdag', 'Pelletier']);
     expect(body.results[1]).toMatchObject({ time: '2:19.315', gap: '+0.317', badge: 'Q' });
     expect(body.results[6]).toMatchObject({ rank: null, status: 'PEN', time: 'PEN' });
+    expect(body.results.map((r: { helmet: number }) => r.helmet)).toEqual([6, 32, 28, 85, 68, 109, 66]);
     expect(body.summary[0]).toBe('Nadalini took the lead on lap 8 and led the last 7 laps.');
     expect(body.chart).toMatchObject({ laps: 14, winner: 'NAD', climber: 'MOO' });
     expect(body.chart.series.map((x: { code: string }) => x.code)).toEqual(['NAD', 'LEE', 'MOO', 'ANT', 'SON', 'BOZ']);
@@ -205,6 +206,13 @@ describe.skipIf(!url)('database + API', () => {
       expect(body.stats.gold).toBe(races.filter((r) => r.medal === 1).length);
       expect(body.bests.map((b: { distance: string }) => b.distance)).toEqual(['500 m', '1000 m', '1500 m']);
       await request(app).get('/athletes/999999').expect(404);
+    });
+
+    it("show this season's helmet number", async () => {
+      const { body } = await request(app).get('/athletes?q=nadalini').expect(200);
+      const thomas = body.results.find((r: { name: string }) => r.name === 'Thomas Nadalini');
+      expect(thomas.helmet).toBe(6);
+      expect((await request(app).get(`/athletes/${thomas.id}`).expect(200)).body.athlete.helmet).toBe(6);
     });
   });
 
@@ -430,6 +438,7 @@ describe.skipIf(!url)('database + API', () => {
       expect(view.cut).toMatchObject({ after: 2 });
       const order: number[] = view.entries.map((e: { entryId: number }) => e.entryId);
       expect(view.entries[0].start).toBe(1);
+      expect(view.entries[0].helmet).toEqual(expect.any(Number));
 
       await request(api()).put(`/picks/heats/${id}`).set('X-Session', fresh).send({ finish: order, penalized: [] }).expect(409);
       await request(api()).put(`/picks/heats/${id}`).set('X-Session', a).send({ finish: order.slice(1), penalized: [] }).expect(400);

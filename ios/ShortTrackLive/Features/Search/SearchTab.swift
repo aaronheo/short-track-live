@@ -99,6 +99,7 @@ struct RecentAthlete: Codable, Hashable, Identifiable {
     let iso2: String?
     let gender: String?
     let races: Int
+    var helmet: Int? = nil
 }
 
 private struct SearchResults: View {
@@ -139,7 +140,7 @@ private struct SearchResults: View {
                         section(title: results.count == 1 ? "1 athlete" : "\(results.count) athletes") {
                             ForEach(Array(results.enumerated()), id: \.element.id) { index, hit in
                                 if index > 0 { RowDivider(leading: 52) }
-                                row(id: hit.id, name: hit.name, nat: hit.nat, iso2: hit.iso2, gender: hit.gender, races: hit.races)
+                                row(id: hit.id, name: hit.name, nat: hit.nat, iso2: hit.iso2, gender: hit.gender, races: hit.races, helmet: hit.helmet)
                             }
                         }
                     }
@@ -257,7 +258,7 @@ private struct SearchResults: View {
         section(title: "Recent", action: ("Clear", { withAnimation(.snappy) { recentData = Data() } })) {
             ForEach(Array(recent.enumerated()), id: \.element.id) { index, athlete in
                 if index > 0 { RowDivider(leading: 52) }
-                row(id: athlete.id, name: athlete.name, nat: athlete.nat, iso2: athlete.iso2, gender: athlete.gender, races: athlete.races)
+                row(id: athlete.id, name: athlete.name, nat: athlete.nat, iso2: athlete.iso2, gender: athlete.gender, races: athlete.races, helmet: athlete.helmet)
             }
         }
     }
@@ -281,17 +282,20 @@ private struct SearchResults: View {
         }
     }
 
-    private func row(id: Int, name: String, nat: String?, iso2: String?, gender: String?, races: Int) -> some View {
+    private func row(id: Int, name: String, nat: String?, iso2: String?, gender: String?, races: Int, helmet: Int?) -> some View {
         let selected = model.isSplit && model.searchAthlete == id
         return Button {
-            remember(RecentAthlete(id: id, name: name, nat: nat, iso2: iso2, gender: gender, races: races))
+            remember(RecentAthlete(id: id, name: name, nat: nat, iso2: iso2, gender: gender, races: races, helmet: helmet))
             model.openAthlete(id)
         } label: {
             HStack(spacing: 12) {
                 FlagView(iso2: iso2, nat: nat, size: 18)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(highlighted(name))
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(highlighted(name))
+                            .lineLimit(1)
+                        HelmetBadge(number: helmet)
+                    }
                     Text([Fmt.country(iso2: iso2, fallback: nat), gender, "\(races) races"].compactMap { $0 }.joined(separator: " · "))
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)

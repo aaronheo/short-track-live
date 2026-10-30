@@ -47,6 +47,7 @@ struct PickHeat: Decodable, Sendable {
         let nat: String?
         let iso2: String?
         let start: Int?
+        var helmet: Int? = nil
         var id: Int { entryId }
     }
 

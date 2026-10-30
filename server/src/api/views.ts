@@ -35,6 +35,8 @@ export interface ScheduleResponse {
 export interface EntryView {
   id: number; athleteId: number | null; rank: number | null; name: string; last: string; nat: string | null; iso2: string | null;
   startPosition: number | null; time: string | null; gap: string | null; status: string | null;
+  /** Helmet cover number (ISU's bib): the skater's place in last season's World Tour. */
+  helmet: number | null;
   badge: string | null; lastLap: string | null; laps: number;
   /** Relays (heat detail only): who skated for the team. */
   members?: RelayMember[];
@@ -102,7 +104,7 @@ export function scheduleView(event: EventRow, rows: ScheduleRow[]): ScheduleResp
 function entryView(e: EntryRow, winnerMs: number | null, running: boolean, state: HeatState): EntryView {
   return {
     id: e.id, athleteId: e.skater_id, rank: running ? e.last_position : e.rank, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2,
-    startPosition: e.start_position,
+    startPosition: e.start_position, helmet: e.helmet,
     time: running ? null : shownTime(e.time_text, e.status, state),
     gap: !running && e.time_ms != null && winnerMs != null && e.time_ms > winnerMs ? gap(e.time_ms - winnerMs) : null,
     status: e.status, badge: running ? null : e.qualification, lastLap: raceTime(e.last_lap_ms), laps: e.lap_count,

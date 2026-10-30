@@ -268,11 +268,14 @@ struct ResultRow: View {
         HStack(spacing: 10) {
             RankText(rank: entry.rank, medals: medals)
             FlagView(iso2: entry.iso2, nat: entry.nat)
-            Text(entry.name)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 6) {
+                Text(entry.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                HelmetBadge(number: entry.helmet)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 5) {
                 CardIcon(status: entry.status)
                 Text(entry.time ?? entry.status ?? "")
@@ -324,11 +327,14 @@ struct LiveHeatCard: View {
                 HStack(spacing: 10) {
                     RankText(rank: entry.rank)
                     FlagView(iso2: entry.iso2, nat: entry.nat)
-                    Text(entry.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 6) {
+                        Text(entry.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                        HelmetBadge(number: entry.helmet)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     Text(entry.lastLap ?? "")
                         .font(.subheadline)
                         .monospacedDigit()
@@ -438,6 +444,7 @@ struct StartListCard: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Theme.ink)
                                 .lineLimit(1)
+                            HelmetBadge(number: entry.helmet)
                         }
                         .frame(minHeight: 32)
                         .accessibilityElement(children: .combine)

@@ -115,7 +115,7 @@ struct ProfileView: View {
                     if index > 0 { RowDivider(leading: 52) }
                     HStack(spacing: 0) {
                         NavigationLink(value: Route.athlete(skater.id)) {
-                            SkaterLabel(name: skater.name, nat: skater.nat, iso2: skater.iso2,
+                            SkaterLabel(name: skater.name, nat: skater.nat, iso2: skater.iso2, helmet: skater.helmet,
                                         meta: [Fmt.country(iso2: skater.iso2, fallback: skater.nat), skater.gender].compactMap { $0 }.joined(separator: " · "))
                                 .padding(.leading, 16)
                                 .frame(minHeight: 60)
@@ -126,7 +126,7 @@ struct ProfileView: View {
                             if favorites.contains(skater.id) {
                                 favorites.remove(skater.id)
                             } else {
-                                favorites.add(id: skater.id, name: skater.name, last: skater.last, nat: skater.nat, iso2: skater.iso2, gender: skater.gender)
+                                favorites.add(id: skater.id, name: skater.name, last: skater.last, nat: skater.nat, iso2: skater.iso2, gender: skater.gender, helmet: skater.helmet)
                             }
                         }
                         .padding(.trailing, 6)
@@ -309,16 +309,20 @@ struct SkaterLabel: View {
     let name: String
     let nat: String?
     let iso2: String?
+    var helmet: Int? = nil
     let meta: String
 
     var body: some View {
         HStack(spacing: 12) {
             FlagView(iso2: iso2, nat: nat, size: 18)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(name)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    HelmetBadge(number: helmet)
+                }
                 Text(meta)
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)

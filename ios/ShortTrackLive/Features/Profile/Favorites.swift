@@ -11,6 +11,8 @@ struct FavoriteSkater: Codable, Hashable, Identifiable, Sendable {
     let gender: String?
     /// Notifications only cover races after this.
     let addedAt: Date
+    /// This season's helmet number, as of the last account sync or when starred.
+    var helmet: Int? = nil
 }
 
 /// Favorite skaters and which notifications to get about them.
@@ -41,9 +43,9 @@ final class Favorites {
 
     func contains(_ id: Int) -> Bool { skaters.contains { $0.id == id } }
 
-    func add(id: Int, name: String, last: String, nat: String?, iso2: String?, gender: String?) {
+    func add(id: Int, name: String, last: String, nat: String?, iso2: String?, gender: String?, helmet: Int?) {
         guard !contains(id) else { return }
-        skaters.append(FavoriteSkater(id: id, name: name, last: last, nat: nat, iso2: iso2, gender: gender, addedAt: .now))
+        skaters.append(FavoriteSkater(id: id, name: name, last: last, nat: nat, iso2: iso2, gender: gender, addedAt: .now, helmet: helmet))
         save()
     }
 
@@ -56,6 +58,20 @@ final class Favorites {
     func replace(with list: [FavoriteSkater]) {
         skaters = list
         save()
+    }
+
+    /// The account's helmet numbers for these skaters (they change each season).
+    /// Not a change to send back, so no onChange.
+    func updateHelmets(from list: [FavoriteSkater]) {
+        let helmets = Dictionary(list.map { ($0.id, $0.helmet) }, uniquingKeysWith: { a, _ in a })
+        let updated = skaters.map { skater in
+            var skater = skater
+            if let helmet = helmets[skater.id] { skater.helmet = helmet }
+            return skater
+        }
+        guard updated != skaters else { return }
+        skaters = updated
+        defaults.set(try? JSONEncoder().encode(skaters), forKey: Keys.skaters)
     }
 
     private func save() {

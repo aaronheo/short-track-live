@@ -71,6 +71,28 @@ struct QualBadge: View {
     }
 }
 
+/// A skater's helmet cover number (ISU's bib: their place in last season's
+/// World Tour), outlined beside their name.
+struct HelmetBadge: View {
+    let number: Int?
+    var large = false
+
+    var body: some View {
+        if let number {
+            Text("\(number)")
+                .font(.condensed(large ? .title3 : .footnote))
+                .foregroundStyle(large ? Theme.ink : Theme.text2)
+                .padding(.horizontal, large ? 6 : 4)
+                .frame(minWidth: large ? 30 : 22, minHeight: large ? 24 : 17)
+                .background {
+                    RoundedRectangle(cornerRadius: large ? 6 : 5).strokeBorder(Theme.faint, lineWidth: 1)
+                }
+                .fixedSize()
+                .accessibilityLabel("Helmet \(number)")
+        }
+    }
+}
+
 /// Fixed-width column for a badge, so times line up whether or not a row has one.
 struct BadgeSlot: View {
     let code: String?

@@ -187,6 +187,7 @@ final class AccountStore {
         synced = saved
         account = state.account
         syncedAt = .now
+        favorites.updateHelmets(from: state.favorites)
         guard current != saved else { return }
         favorites.replace(with: state.favorites)
         if let on = state.settings.notifyStarts { favorites.notifyStarts = on }

@@ -4,14 +4,15 @@
 import type { Db } from '../db/pool.js';
 import { distanceLabel, medal, raceTime, roundLabel, shortEventName, shownTime } from '../domain/format.js';
 import { weekdayMonthDay } from '../domain/time.js';
+import { helmetSql } from './helmet.js';
 
 export interface AthleteHit {
-  id: number; name: string; last: string; nat: string | null; iso2: string | null;
+  id: number; name: string; last: string; nat: string | null; iso2: string | null; helmet: number | null;
   gender: 'Men' | 'Women' | null; races: number;
 }
 
 export interface AthleteResponse {
-  athlete: { id: number; name: string; first: string | null; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null };
+  athlete: { id: number; name: string; first: string | null; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; helmet: number | null };
   stats: { races: number; events: number; gold: number; silver: number; bronze: number; since: string | null };
   bests: { distance: string; time: string; event: string; round: string; heatId: number }[];
 }
@@ -106,8 +107,8 @@ export class Athletes {
   /** Name contains the query, most races first. */
   async search(q: string, limit = 30): Promise<AthleteHit[]> {
     const like = `%${q.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-    const res = await this.db.query<{ id: number; first_name: string | null; last_name: string; gender: string | null; nation: string | null; iso2: string | null; races: number }>(
-      `select s.id, s.first_name, s.last_name, s.gender, s.nation, n.iso2,
+    const res = await this.db.query<{ id: number; first_name: string | null; last_name: string; gender: string | null; nation: string | null; iso2: string | null; races: number; helmet: number | null }>(
+      `select s.id, s.first_name, s.last_name, s.gender, s.nation, n.iso2, ${helmetSql('s.id')} as helmet,
          ((select count(*) from entry en where en.skater_id = s.id)
            + (select count(*) from relay_member rm where rm.skater_id = s.id))::int as races
        from skater s left join nation n on n.code = s.nation
@@ -116,13 +117,13 @@ export class Athletes {
        order by races desc, s.last_name, s.first_name limit $2`, [like, limit]);
     return res.rows.map((r) => ({
       id: r.id, name: fullName(r.first_name, r.last_name), last: r.last_name, nat: r.nation, iso2: r.iso2,
-      gender: GENDER[r.gender ?? ''] ?? null, races: r.races,
+      gender: GENDER[r.gender ?? ''] ?? null, races: r.races, helmet: r.helmet,
     }));
   }
 
   async athlete(id: number): Promise<AthleteResponse | null> {
-    const res = await this.db.query<{ id: number; first_name: string | null; last_name: string; gender: string | null; nation: string | null; iso2: string | null }>(
-      `select s.id, s.first_name, s.last_name, s.gender, s.nation, n.iso2
+    const res = await this.db.query<{ id: number; first_name: string | null; last_name: string; gender: string | null; nation: string | null; iso2: string | null; helmet: number | null }>(
+      `select s.id, s.first_name, s.last_name, s.gender, s.nation, n.iso2, ${helmetSql('s.id')} as helmet
        from skater s left join nation n on n.code = s.nation where s.id = $1`, [id]);
     const s = res.rows[0];
     if (!s) return null;
@@ -142,7 +143,7 @@ export class Athletes {
     return {
       athlete: {
         id: s.id, name: fullName(s.first_name, s.last_name), first: s.first_name, last: s.last_name,
-        nat: s.nation, iso2: s.iso2, gender: GENDER[s.gender ?? ''] ?? null,
+        nat: s.nation, iso2: s.iso2, gender: GENDER[s.gender ?? ''] ?? null, helmet: s.helmet,
       },
       stats: stats.rows[0]!,
       bests: bests.rows.map((b) => ({

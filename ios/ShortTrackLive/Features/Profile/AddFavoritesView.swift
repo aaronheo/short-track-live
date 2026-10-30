@@ -24,11 +24,11 @@ struct AddFavoritesView: View {
                             note("No skater matches “\(trimmed)”")
                         } else if !results.isEmpty {
                             list(title: results.count == 1 ? "1 skater" : "\(results.count) skaters",
-                                 rows: results.map { ($0.id, $0.name, $0.last, $0.nat, $0.iso2, $0.gender, $0.gender) })
+                                 rows: results.map { ($0.id, $0.name, $0.last, $0.nat, $0.iso2, $0.gender, $0.gender, $0.helmet) })
                         }
                     } else if let suggested, !suggested.skaters.isEmpty {
                         list(title: suggested.event.map { "Medalists at \($0)" } ?? "Medalists",
-                             rows: suggested.skaters.map { ($0.id, $0.name, $0.last, $0.nat, $0.iso2, $0.gender, $0.note) })
+                             rows: suggested.skaters.map { ($0.id, $0.name, $0.last, $0.nat, $0.iso2, $0.gender, $0.note, $0.helmet) })
                     }
                 }
                 .padding(.horizontal, 16)
@@ -49,7 +49,7 @@ struct AddFavoritesView: View {
         }
     }
 
-    private typealias Row = (id: Int, name: String, last: String, nat: String?, iso2: String?, gender: String?, note: String?)
+    private typealias Row = (id: Int, name: String, last: String, nat: String?, iso2: String?, gender: String?, note: String?, helmet: Int?)
 
     private func list(title: String, rows: [Row]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -58,14 +58,14 @@ struct AddFavoritesView: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { RowDivider(leading: 52) }
                     HStack(spacing: 0) {
-                        SkaterLabel(name: row.name, nat: row.nat, iso2: row.iso2,
+                        SkaterLabel(name: row.name, nat: row.nat, iso2: row.iso2, helmet: row.helmet,
                                     meta: [Fmt.country(iso2: row.iso2, fallback: row.nat), row.note].compactMap { $0 }.joined(separator: " · "))
                             .padding(.leading, 16)
                         StarButton(name: row.name, on: favorites.contains(row.id)) {
                             if favorites.contains(row.id) {
                                 favorites.remove(row.id)
                             } else {
-                                favorites.add(id: row.id, name: row.name, last: row.last, nat: row.nat, iso2: row.iso2, gender: row.gender)
+                                favorites.add(id: row.id, name: row.name, last: row.last, nat: row.nat, iso2: row.iso2, gender: row.gender, helmet: row.helmet)
                             }
                         }
                         .padding(.trailing, 6)
@@ -125,7 +125,7 @@ struct FavoriteButton: View {
                 favorites.remove(athlete.id)
                 return
             }
-            favorites.add(id: athlete.id, name: athlete.name, last: athlete.last, nat: athlete.nat, iso2: athlete.iso2, gender: athlete.gender)
+            favorites.add(id: athlete.id, name: athlete.name, last: athlete.last, nat: athlete.nat, iso2: athlete.iso2, gender: athlete.gender, helmet: athlete.helmet)
             guard !favorites.askedAboutNotifications else { return }
             Task {
                 if await RaceAlerts.shared.status() == .notDetermined { asking = true } else { favorites.askedAboutNotifications = true }

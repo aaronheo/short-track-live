@@ -65,9 +65,12 @@ private struct AthleteHeader: View {
         HStack(spacing: 14) {
             FlagView(iso2: athlete.iso2, nat: athlete.nat, size: 30)
             VStack(alignment: .leading, spacing: 2) {
-                Text(athlete.name)
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(Theme.ink)
+                HStack(spacing: 8) {
+                    Text(athlete.name)
+                        .font(.title.weight(.bold))
+                        .foregroundStyle(Theme.ink)
+                    HelmetBadge(number: athlete.helmet, large: true)
+                }
                 Text([Fmt.country(iso2: athlete.iso2, fallback: athlete.nat), athlete.gender].compactMap { $0 }.joined(separator: " · "))
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)

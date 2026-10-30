@@ -46,7 +46,7 @@ export interface PickHeatView {
   /** Where the dashed line goes: after this many places. */
   cut: { after: number; label: string } | null;
   /** In start order. */
-  entries: { entryId: number; name: string; last: string; nat: string | null; iso2: string | null; start: number | null }[];
+  entries: { entryId: number; name: string; last: string; nat: string | null; iso2: string | null; start: number | null; helmet: number | null }[];
   myPick: PickInput | null;
   /** How everyone picked: once you've picked, or once the race has started. */
   crowd: {
@@ -139,11 +139,11 @@ export class Picks {
     const h = await this.heatRow(heatId);
     if (!h) return null;
     const entries = (await this.db.query<{
-      id: number; name: string; last: string; nation: string | null; iso2: string | null; start_position: number | null;
+      id: number; name: string; last: string; nation: string | null; iso2: string | null; start_position: number | null; helmet: number | null;
       rank: number | null; status: string | null; time_text: string | null;
     }>(
       `select en.id, coalesce(s.first_name || ' ' || s.last_name, s.last_name, t.name) as name, coalesce(s.last_name, t.name) as last,
-         en.nation, n.iso2, en.start_position, en.rank, en.status, en.time_text
+         en.nation, n.iso2, en.start_position, case when en.skater_id is not null then en.bib end as helmet, en.rank, en.status, en.time_text
        from entry en left join skater s on s.id = en.skater_id left join relay_team t on t.id = en.team_id
        left join nation n on n.code = en.nation
        where en.heat_id = $1 order by en.start_position nulls last, en.id`, [heatId])).rows;
@@ -183,7 +183,7 @@ export class Picks {
       state: h.state,
       locked,
       cut: cutLine({ name: h.round, auto_places: h.auto_places, destination: h.destination }, h.name),
-      entries: entries.map((e) => ({ entryId: e.id, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2, start: e.start_position })),
+      entries: entries.map((e) => ({ entryId: e.id, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2, start: e.start_position, helmet: e.helmet })),
       myPick: mine ? { finish: mine.finish, penalized: mine.penalized } : null,
       crowd,
       result: official ? {

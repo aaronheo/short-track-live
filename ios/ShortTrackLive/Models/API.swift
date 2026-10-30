@@ -115,6 +115,8 @@ struct Entry: Decodable, Hashable, Sendable, Identifiable {
     let nat: String?
     let iso2: String?
     let startPosition: Int?
+    /// Helmet cover number in this race (skaters only).
+    var helmet: Int? = nil
     let time: String?
     let gap: String?
     let status: String?
@@ -333,6 +335,8 @@ struct AthleteHit: Decodable, Hashable, Sendable, Identifiable {
     let iso2: String?
     let gender: String?
     let races: Int
+    /// This season's helmet number.
+    var helmet: Int? = nil
 }
 
 struct AthleteSearchResponse: Decodable, Sendable {
@@ -349,6 +353,8 @@ struct AthleteResponse: Decodable, Sendable {
         let nat: String?
         let iso2: String?
         let gender: String?
+        /// This season's helmet number.
+        var helmet: Int? = nil
     }
 
     struct Stats: Decodable, Sendable {
@@ -469,6 +475,7 @@ struct SuggestedSkatersResponse: Decodable, Sendable {
         let nat: String?
         let iso2: String?
         let gender: String?
+        var helmet: Int? = nil
         let note: String // "Gold 500, 1000 and 1500 m"
     }
 

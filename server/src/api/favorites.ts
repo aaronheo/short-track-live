@@ -5,6 +5,7 @@ import type { Db } from '../db/pool.js';
 import { medalNote, result, upNext, type AlertRace, type AlertSkater, type AlertText } from '../domain/alerts.js';
 import { shortEventName } from '../domain/format.js';
 import type { HeatRow } from './repo.js';
+import { helmetSql } from './helmet.js';
 
 export interface FavoriteRace {
   heatId: number;
@@ -26,7 +27,7 @@ export interface FavoritesResponse { races: FavoriteRace[] }
 
 export interface SuggestedResponse {
   event: string | null; // "World Tour #1"
-  skaters: { id: number; name: string; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; note: string }[];
+  skaters: { id: number; name: string; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; helmet: number | null; note: string }[];
 }
 
 interface Row {
@@ -135,7 +136,7 @@ export class Favorites {
     const FINAL = `not c.is_relay and r.name ilike 'final%' and (h.name ~* '^final( a\\M|$)') and en.rank between 1 and 3`;
     const rows = (await this.db.query<{
       id: number; first_name: string | null; last_name: string; gender: string | null; nation: string | null; iso2: string | null;
-      rank: number; distance_m: number; event_name: string;
+      rank: number; distance_m: number; event_name: string; helmet: number | null;
     }>(
       `with latest as (
          select e.id, e.name from event e
@@ -143,7 +144,8 @@ export class Favorites {
                        join entry en on en.heat_id = h.id
                        where c.event_id = e.id and h.state = 'official' and ${FINAL})
          order by e.ends_on desc, e.id desc limit 1)
-       select s.id, s.first_name, s.last_name, s.gender, s.nation, n.iso2, en.rank, c.distance_m, l.name as event_name
+       select s.id, s.first_name, s.last_name, s.gender, s.nation, n.iso2, en.rank, c.distance_m, l.name as event_name,
+         ${helmetSql('s.id')} as helmet
        from latest l
        join competition c on c.event_id = l.id
        join round r on r.competition_id = c.id
@@ -164,7 +166,7 @@ export class Favorites {
           const s = rs[0]!;
           return {
             id: s.id, name: s.first_name ? `${s.first_name} ${s.last_name}` : s.last_name, last: s.last_name,
-            nat: s.nation, iso2: s.iso2, gender: GENDER[s.gender ?? ''] ?? null,
+            nat: s.nation, iso2: s.iso2, gender: GENDER[s.gender ?? ''] ?? null, helmet: s.helmet,
             note: medalNote(rs.map((r) => ({ place: r.rank, distanceM: r.distance_m }))),
           };
         }),

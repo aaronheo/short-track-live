@@ -119,10 +119,13 @@ private struct HeatResultRow: View {
             RankText(rank: entry.rank, medals: medals && !running)
                 .frame(width: 28, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(entry.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    HelmetBadge(number: entry.helmet)
+                }
                 HStack(spacing: 6) {
                     FlagView(iso2: entry.iso2, nat: entry.nat, size: 12)
                     Text([entry.nat, entry.startPosition.map { "Start \($0)" }].compactMap { $0 }.joined(separator: " · "))

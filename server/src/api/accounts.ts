@@ -5,6 +5,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Db } from '../db/pool.js';
+import { helmetSql } from './helmet.js';
 
 export interface GoogleIdentity { sub: string; email: string | null; name: string | null }
 /** Checks a Google ID token from the app; throws when it isn't valid for us. */
@@ -20,7 +21,7 @@ export interface Settings {
 
 export interface AccountState {
   account: { name: string | null; email: string | null; provider: 'google'; nickname: string | null };
-  favorites: { id: number; name: string; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; addedAt: string }[];
+  favorites: { id: number; name: string; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; helmet: number | null; addedAt: string }[];
   settings: Settings;
   updatedAt: string;
 }
@@ -103,16 +104,16 @@ export class Accounts {
       'select name, email, nickname, settings, updated_at from account where id = $1', [accountId])).rows[0];
     if (!account) return null;
     const favorites = (await this.db.query<{
-      id: number; first_name: string | null; last_name: string; nation: string | null; iso2: string | null; gender: string | null; added_at: Date;
+      id: number; first_name: string | null; last_name: string; nation: string | null; iso2: string | null; gender: string | null; added_at: Date; helmet: number | null;
     }>(
-      `select s.id, s.first_name, s.last_name, s.nation, n.iso2, s.gender, f.added_at
+      `select s.id, s.first_name, s.last_name, s.nation, n.iso2, s.gender, f.added_at, ${helmetSql('s.id')} as helmet
        from account_favorite f join skater s on s.id = f.skater_id left join nation n on n.code = s.nation
        where f.account_id = $1 order by f.added_at, s.id`, [accountId])).rows;
     return {
       account: { name: account.name, email: account.email, provider: 'google', nickname: account.nickname },
       favorites: favorites.map((f) => ({
         id: f.id, name: f.first_name ? `${f.first_name} ${f.last_name}` : f.last_name, last: f.last_name,
-        nat: f.nation, iso2: f.iso2, gender: GENDER[f.gender ?? ''] ?? null, addedAt: f.added_at.toISOString(),
+        nat: f.nation, iso2: f.iso2, gender: GENDER[f.gender ?? ''] ?? null, helmet: f.helmet, addedAt: f.added_at.toISOString(),
       })),
       settings: cleanSettings(account.settings),
       updatedAt: account.updated_at.toISOString(),

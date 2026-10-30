@@ -429,7 +429,10 @@ struct PickView: View {
                             .font(.condensed(.title3)).frame(width: 34)
                         FlagView(iso2: entry.iso2, nat: entry.nat, size: 16)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.name).font(.callout.weight(.semibold)).lineLimit(1)
+                            HStack(spacing: 6) {
+                                Text(entry.name).font(.callout.weight(.semibold)).lineLimit(1)
+                                HelmetBadge(number: entry.helmet)
+                            }
                             Text([line.time, mine.map { "You: \(Fmt.pickPlace($0.picked))" }].compactMap { $0 }.joined(separator: " · "))
                                 .font(.footnote).foregroundStyle(Theme.muted)
                         }
@@ -538,7 +541,10 @@ private struct PickRow: View {
             .frame(width: 26)
             FlagView(iso2: entry.iso2, nat: entry.nat, size: 16)
             VStack(alignment: .leading, spacing: 1) {
-                Text(entry.name).font(.callout.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(entry.name).font(.callout.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
+                    HelmetBadge(number: entry.helmet)
+                }
                 if let start = entry.start {
                     Text("Starts \(Fmt.ordinal(start))").font(.caption).foregroundStyle(Theme.muted)
                 }
@@ -591,6 +597,7 @@ private struct CrowdRow: View {
                 HStack(spacing: 10) {
                     FlagView(iso2: entry.iso2, nat: entry.nat, size: 15)
                     Text(entry.name).font(.callout.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
+                    HelmetBadge(number: entry.helmet)
                     Spacer(minLength: 6)
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("MOST PICKED").font(.caption2.weight(.semibold)).foregroundStyle(Theme.muted)
