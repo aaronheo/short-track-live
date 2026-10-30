@@ -210,11 +210,11 @@ export class Ingest {
        from heat h left join entry e on e.heat_id = h.id
        where h.id = any($1::int[]) group by h.id`, [perHeat.map((h) => h.heatId)]);
     const previousEntries = new Map(previous.rows.map((r) => [r.heat_id, r.entries]));
-    const wasStartList = (h: IsuHeat) => h.result_status === 'Start List';
-    // ISU occasionally drops most of an individual start list from a live
-    // response. Keep a roster until its replacement is at least half as large.
+    const isUnfinished = (h: IsuHeat) => h.result_status !== 'Official';
+    // ISU occasionally drops most entrants from an unfinished heat in a live
+    // response. Keep its roster until an official result replaces it.
     const protectedHeats = new Set(perHeat
-      .filter((h, i) => wasStartList(heats[i]!) && h.entries.length * 2 < (previousEntries.get(h.heatId) ?? 0))
+      .filter((h, i) => isUnfinished(heats[i]!) && h.entries.length * 2 < (previousEntries.get(h.heatId) ?? 0))
       .map((h) => h.heatId));
     const all = perHeat.flatMap((h) => h.entries);
     await this.nations(all.flatMap((e) => [[e.nat, null], [e.skater?.nationality_code, null], [e.team?.nf_organization_code, null]] as [string | null | undefined, string | null][]));
