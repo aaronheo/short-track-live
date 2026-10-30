@@ -5,7 +5,6 @@ struct ScheduleView: View {
     @Environment(AppModel.self) private var model
     @State private var live: Live<ScheduleResponse>
     @State private var day: String?
-    @State private var showEarlier = false
     @AppStorage(RaceTimes.key) private var venueTime = true
 
     init(slug: String) {
@@ -65,7 +64,6 @@ struct ScheduleView: View {
                 DayTabs(days: days, selected: selected?.key) { key in
                     withAnimation(.snappy) {
                         day = key
-                        showEarlier = false
                     }
                 }
             }
@@ -131,31 +129,9 @@ struct ScheduleView: View {
 
     @ViewBuilder
     private func cardRows(_ day: ScheduleResponse.Day, zone: TimeZone) -> some View {
-        // On the day that's racing, fold away all but the last three finished races.
-        let firstOpen = day.items.firstIndex { $0.state != .finished } ?? day.items.count
-        let isToday = day.live || (firstOpen > 0 && firstOpen < day.items.count)
-        let hidden = isToday && !showEarlier && firstOpen > 4 ? firstOpen - 3 : 0
-        let shown = day.items.dropFirst(hidden)
         VStack(spacing: 0) {
-            if hidden > 0 {
-                Button {
-                    withAnimation(.snappy) { showEarlier = true }
-                } label: {
-                    HStack {
-                        Text("Show \(hidden) earlier rounds")
-                        Spacer()
-                        Chevron(direction: .down, color: Theme.link)
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.link)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 48)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(RowButtonStyle())
-            }
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
-                if index > 0 || hidden > 0 { RowDivider(leading: 76) }
+            ForEach(Array(day.items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { RowDivider(leading: 76) }
                 ScheduleRow(item: item, time: time(item, zone: zone)).id(item.id)
             }
         }
