@@ -470,13 +470,22 @@ describe.skipIf(!url)('database + API', () => {
       const a = await session('pick-a');
       const b = await session('pick-b');
       const fresh = await session('pick-no-name');
-      const { id } = await heatOf('Quarterfinals', 'Heat 6', 'start_list');
+      // The first relay heat follows a session break, so it remains editable
+      // until three minutes before its listed start.
+      const { id, starts_at } = await one<{ id: number; starts_at: Date }>(
+        `select h.id, h.starts_at from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+         join event e on e.id = c.event_id
+         where e.slug = $1 and c.name = 'Men 5000 m Relay' and r.name = 'Quarterfinals' and h.name = 'Heat 1'`, [WT1_2026]);
       const view = (await request(api()).get(`/picks/heats/${id}`).set('X-Session', a).expect(200)).body;
       expect(view).toMatchObject({ locked: false, myPick: null, crowd: null, result: null });
+      expect(new Date(view.locksAt).getTime()).toBe(starts_at.getTime() - 3 * 60_000);
+      // Men 1500 m Heat 6 is within the two-race buffer behind the live heat.
+      const near = await heatOf('Quarterfinals', 'Heat 6', 'start_list');
+      expect((await request(api()).get(`/picks/heats/${near.id}`).set('X-Session', a).expect(200)).body.locked).toBe(true);
       expect(view.cut).toMatchObject({ after: 2 });
       const order: number[] = view.entries.map((e: { entryId: number }) => e.entryId);
       expect(view.entries[0].start).toBe(1);
-      expect(view.entries[0].helmet).toEqual(expect.any(Number));
+      expect(view.entries[0].helmet).toBeNull(); // relay teams do not have helmet covers
 
       await request(api()).put(`/picks/heats/${id}`).set('X-Session', fresh).send({ finish: order, penalized: [] }).expect(409);
       await request(api()).put(`/picks/heats/${id}`).set('X-Session', a).send({ finish: order.slice(1), penalized: [] }).expect(400);

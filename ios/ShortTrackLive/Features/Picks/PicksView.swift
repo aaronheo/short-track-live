@@ -344,11 +344,11 @@ struct PickView: View {
         if heat.state == "official" {
             Label("Official result", systemImage: "checkmark.seal.fill").font(.footnote.weight(.semibold)).foregroundStyle(Theme.positive)
         } else if heat.locked {
-            Label("Locked: the race has started", systemImage: "lock.fill").font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted)
-        } else if let starts = heat.startsAt {
+            Label("Locked: picks close two races early", systemImage: "lock.fill").font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted)
+        } else if let locks = heat.locksAt {
             TimelineView(.periodic(from: .now, by: 1)) { context in
-                let left = starts.timeIntervalSince(context.date)
-                Label(left > 0 ? "Picks lock when the race starts · \(countdown(left))" : "Picks lock when the race starts",
+                let left = locks.timeIntervalSince(context.date)
+                Label(left > 0 ? "Picks lock two races early · \(countdown(left))" : "Picks lock two races early",
                       systemImage: "timer")
                     .font(.footnote.weight(.semibold)).foregroundStyle(Theme.link)
             }

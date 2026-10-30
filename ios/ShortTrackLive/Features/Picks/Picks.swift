@@ -87,8 +87,9 @@ struct PickHeat: Decodable, Sendable {
     let race: String
     let startsAt: Date?
     let state: String
-    /// Picks close when the race starts.
+    /// Picks close two races early, except shortly before a session restart.
     let locked: Bool
+    let locksAt: Date?
     let cut: Cut?
     /// Start order.
     let entries: [Entry]
