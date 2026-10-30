@@ -7,7 +7,7 @@ import type { HeatState } from '../domain/normalize.js';
 import { placesCard, type PlacesCard } from '../domain/places.js';
 import type { QualRule } from '../domain/rules.js';
 import { summarize } from '../domain/summary.js';
-import { clock, dayKey, dayLabel, lapsFor } from '../domain/time.js';
+import { clock, dayKey, dayLabel, lapTotalLabel, lapsFor } from '../domain/time.js';
 import type { EntryRow, EventRow, HeatRow, LapRow, MemberRow, RoundRow, ScheduleRow } from './repo.js';
 
 type State = 'upcoming' | 'live' | 'finished';
@@ -182,7 +182,7 @@ export function onTheIce(view: RoundResponse): OnTheIce {
   return {
     roundId: view.round.id, competition: view.round.competition, round: view.round.name,
     heat: index ? `Heat ${index} of ${view.heats.length}` : null,
-    lap: running?.lap ? `Lap ${running.lap.current} of ${running.lap.total ?? '?'}` : null,
+    lap: running?.lap ? `Lap ${running.lap.current} of ${lapTotalLabel(running.lap.total)}` : null,
     isLive: running != null,
   };
 }

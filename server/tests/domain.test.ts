@@ -10,7 +10,7 @@ import { WORLD_TOUR_POINTS, classifyStanding, genderOfSkaters, standingEventCity
 import { summarize } from '../src/domain/summary.js';
 import { heatTimes } from '../src/domain/time.js';
 import { isConnectionError } from '../src/sync/worker.js';
-import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
+import { clock, dayLabel, lapTotalLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
 import { WORLDS, WT1_2026, placeHeats, round, standings2026, tree } from './fixtures.js';
 
 describe('time', () => {
@@ -45,6 +45,8 @@ describe('time', () => {
     expect(millis('no time')).toBeNull();
     expect(lapsFor(1500)).toBe(14);
     expect(lapsFor(500)).toBe(5);
+    expect(lapTotalLabel(14)).toBe('13½');
+    expect(lapTotalLabel(5)).toBe('4½');
   });
 });
 

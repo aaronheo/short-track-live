@@ -251,7 +251,7 @@ private struct PositionChart: View {
                         .font(.headline)
                         .foregroundStyle(Theme.ink)
                     Spacer(minLength: 8)
-                    Text("Lap \(min(chart.laps, Int(lap))) of \(chart.laps)")
+                    Text("Lap \(min(chart.laps, Int(lap))) of \(Fmt.lapTotal(chart.laps))")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(Theme.muted)

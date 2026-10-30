@@ -359,7 +359,7 @@ struct LiveHeatCard: View {
                         .foregroundStyle(Theme.ink)
                         .contentTransition(.numericText(value: Double(lap.current)))
                     if let total = lap.total {
-                        Text("OF \(total)").foregroundStyle(Theme.muted)
+                        Text("OF \(Fmt.lapTotal(total))").foregroundStyle(Theme.muted)
                     }
                 }
                 .font(.condensed(.title2))
@@ -382,7 +382,7 @@ struct LiveHeatCard: View {
         .padding(.top, 4)
         .padding(.bottom, 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Lap \(lap.current)\(lap.total.map { " of \($0)" } ?? "")")
+        .accessibilityLabel("Lap \(lap.current)\(lap.total.map { " of \(Fmt.lapTotal($0))" } ?? "")")
     }
 }
 

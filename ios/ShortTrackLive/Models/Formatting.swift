@@ -44,6 +44,15 @@ enum Fmt {
         return "\(n)\(suffix)"
     }
 
+    /// ISU's lap data includes the opening half lap as a full data point.
+    static func lapTotal(_ total: Int) -> String {
+        switch total {
+        case 5: "4½"
+        case 14: "13½"
+        default: "\(total)"
+        }
+    }
+
     /// "2026/2027" → "2026-2027" for the URL.
     static func seasonPath(_ title: String) -> String {
         title.replacingOccurrences(of: "/", with: "-")

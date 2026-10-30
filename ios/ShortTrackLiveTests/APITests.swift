@@ -15,7 +15,7 @@ struct DecodingTests {
         let live = try #require(events.live)
         #expect(live.event.shortName == "World Tour #1")
         #expect(live.onTheIce?.heat == "Heat 5 of 7")
-        #expect(live.onTheIce?.lap == "Lap 3 of 14")
+        #expect(live.onTheIce?.lap == "Lap 3 of 13½")
     }
 
     @Test func schedule() throws {
@@ -104,6 +104,12 @@ struct FormattingTests {
         #expect(Fmt.dateBlock("2026-11-06") == ("NOV", "6"))
         #expect(Fmt.dateRangeWithYear("2026-10-23", "2026-10-25") == "Oct 23–25, 2026")
         #expect(Fmt.monthYear("2025-10-09") == "Oct 2025")
+    }
+
+    @Test func shortTrackLapTotals() {
+        #expect(Fmt.lapTotal(5) == "4½")
+        #expect(Fmt.lapTotal(9) == "9")
+        #expect(Fmt.lapTotal(14) == "13½")
     }
 
     @Test func seasons() {

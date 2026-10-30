@@ -135,3 +135,10 @@ export function millis(text: string | null | undefined): number | null {
 export function lapsFor(distanceM: number | null): number | null {
   return distanceM ? Math.ceil(distanceM / 111.12) : null;
 }
+
+/** Human race-distance label; ISU counts the opening half lap as a full data lap. */
+export function lapTotalLabel(total: number | null): string {
+  if (total === 5) return '4½';
+  if (total === 14) return '13½';
+  return total?.toString() ?? '?';
+}
