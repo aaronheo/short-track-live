@@ -382,6 +382,7 @@ struct AthleteRace: Decodable, Hashable, Sendable, Identifiable {
         let city: String?
         let startsOn: String
         let endsOn: String
+        let timeZone: String?
     }
 
     let entryId: Int
@@ -393,6 +394,8 @@ struct AthleteRace: Decodable, Hashable, Sendable, Identifiable {
     let round: String
     let day: String
     let startsAt: Date
+    /// The heat's start time, when ISU has one.
+    let startTime: Date?
     let rank: Int?
     let time: String?
     let badge: String?
@@ -401,6 +404,9 @@ struct AthleteRace: Decodable, Hashable, Sendable, Identifiable {
     let team: String?
 
     var id: Int { entryId }
+
+    /// Not raced yet: no place, time or status.
+    var upcoming: Bool { rank == nil && time == nil && status == nil }
 }
 
 struct RaceFacet: Decodable, Hashable, Sendable, Identifiable {

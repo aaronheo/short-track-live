@@ -18,8 +18,10 @@ export interface AthleteResponse {
 
 export interface AthleteRace {
   entryId: number; heatId: number; roundId: number; season: string;
-  event: { slug: string; name: string; city: string | null; startsOn: string; endsOn: string };
+  event: { slug: string; name: string; city: string | null; startsOn: string; endsOn: string; timeZone: string };
   distance: string; round: string; day: string; startsAt: string;
+  /** The heat's start time, when ISU has one (startsAt falls back to the event's first day). */
+  startTime: string | null;
   rank: number | null; time: string | null; badge: string | null; status: string | null;
   medal: number | null; team: string | null;
 }
@@ -50,7 +52,7 @@ const fullName = (first: string | null, last: string) => (first ? `${first} ${la
 // One row per race the athlete skated, individual or relay.
 const MINE = `
   select en.id as entry_id, en.rank, en.time_text, en.time_ms, en.qualification, en.status,
-    h.id as heat_id, h.name as heat, h.state as heat_state, coalesce(h.starts_at, e.starts_on::timestamptz) as at,
+    h.id as heat_id, h.name as heat, h.state as heat_state, coalesce(h.starts_at, e.starts_on::timestamptz) as at, h.starts_at,
     r.id as round_id, r.name as round, c.name as competition, c.distance_m, c.is_relay,
     e.slug, e.name as event_name, e.city, e.time_zone,
     to_char(e.starts_on, 'YYYY-MM-DD') as starts_on, to_char(e.ends_on, 'YYYY-MM-DD') as ends_on,
@@ -66,7 +68,7 @@ const MINE = `
 
 interface MineRow {
   entry_id: number; rank: number | null; time_text: string | null; time_ms: number | null;
-  qualification: string | null; status: string | null; heat_id: number; heat: string; heat_state: string; at: Date;
+  qualification: string | null; status: string | null; heat_id: number; heat: string; heat_state: string; at: Date; starts_at: Date | null;
   round_id: number; round: string; competition: string; distance_m: number | null; is_relay: boolean;
   slug: string; event_name: string; city: string | null; time_zone: string; starts_on: string; ends_on: string;
   season: string; team: string | null;
@@ -209,11 +211,11 @@ export const shortSeason = (title: string) => title.replace(/^(\d{4})\/\d{2}(\d{
 function raceView(r: MineRow): AthleteRace {
   return {
     entryId: r.entry_id, heatId: r.heat_id, roundId: r.round_id, season: r.season,
-    event: { slug: r.slug, name: shortEventName(r.event_name), city: r.city, startsOn: r.starts_on, endsOn: r.ends_on },
+    event: { slug: r.slug, name: shortEventName(r.event_name), city: r.city, startsOn: r.starts_on, endsOn: r.ends_on, timeZone: r.time_zone },
     distance: distanceLabel(r.competition, r.distance_m, r.is_relay),
     round: roundLabel(r.round, r.heat),
     day: weekdayMonthDay(r.at, r.time_zone),
-    startsAt: r.at.toISOString(),
+    startsAt: r.at.toISOString(), startTime: r.starts_at?.toISOString() ?? null,
     rank: r.rank, time: shownTime(r.time_text, r.status, r.heat_state), badge: r.qualification, status: r.status,
     medal: medal(r.heat, r.rank), team: r.is_relay ? r.team : null,
   };

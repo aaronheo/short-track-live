@@ -63,6 +63,13 @@ enum Fmt {
         return date.formatted(style).replacingOccurrences(of: ",", with: "")
     }
 
+    /// "Fri Oct 30" in a time zone.
+    static func weekdayMonthDay(_ date: Date, in zone: TimeZone) -> String {
+        var style = Date.FormatStyle(timeZone: zone).weekday(.abbreviated).month(.abbreviated).day()
+        style.locale = Locale(identifier: "en_US")
+        return date.formatted(style).replacingOccurrences(of: ",", with: "")
+    }
+
     /// "PT", "ET" in North America, "CET"/"CEST" in Europe, else "GMT+9" etc.
     static func zoneName(_ zone: TimeZone, at date: Date = .now) -> String {
         if let generic = zone.localizedName(for: .shortGeneric, locale: Locale(identifier: "en_US")),

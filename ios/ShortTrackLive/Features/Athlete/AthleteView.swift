@@ -387,6 +387,18 @@ private struct EventGroup: View {
 
 private struct RaceRow: View {
     let race: AthleteRace
+    @AppStorage("scheduleInVenueTime") private var venueTime = true
+
+    /// An upcoming race's start: venue or my time, as on the Schedule.
+    private var start: (clock: String, day: String)? {
+        guard race.upcoming, let at = race.startTime else { return nil }
+        let venue = race.event.timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
+        let zone = venueTime ? venue : .current
+        // The zone's name only when venue and phone clocks differ ("09:54 ET").
+        let sameClock = venue.secondsFromGMT(for: at) == TimeZone.current.secondsFromGMT(for: at)
+        let clock = Fmt.clock(at, in: zone) + (sameClock ? "" : " \(Fmt.zoneName(zone, at: at))")
+        return (clock, Fmt.weekdayMonthDay(at, in: zone))
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -415,11 +427,18 @@ private struct RaceRow: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(race.time ?? race.status ?? "–")
-                    .font(.subheadline.weight(.medium))
-                    .monospacedDigit()
-                    .foregroundStyle(race.rank == nil || race.time == nil ? Theme.muted : Theme.ink)
-                Text(race.day)
+                if let start {
+                    Text(start.clock)
+                        .font(.subheadline.weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                } else {
+                    Text(race.time ?? race.status ?? "–")
+                        .font(.subheadline.weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(race.rank == nil || race.time == nil ? Theme.muted : Theme.ink)
+                }
+                Text(start?.day ?? race.day)
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }

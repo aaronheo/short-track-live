@@ -85,11 +85,19 @@ struct AthleteDecodingTests {
         #expect(page.races.count == 5)
         #expect(page.nextCursor != nil)
         #expect(page.races.first?.medal == 1)
+        #expect(page.races.first?.upcoming == false)
         #expect(page.facets?.distances.map(\.value) == ["500", "1000", "1500", "relay"])
     }
 }
 
 struct FormattingTests {
+    @Test func upcomingRaceDay() {
+        let at = Date(timeIntervalSince1970: 1_793_368_440) // 2026-10-30 13:54 UTC
+        let montreal = TimeZone(identifier: "America/Toronto")!
+        #expect(Fmt.weekdayMonthDay(at, in: montreal) == "Fri Oct 30")
+        #expect(Fmt.clock(at, in: montreal) == "09:54")
+    }
+
     @Test func dateRanges() {
         #expect(Fmt.dateRange("2026-10-23", "2026-10-25") == "Oct 23–25")
         #expect(Fmt.dateRange("2026-10-30", "2026-11-01") == "Oct 30 – Nov 1")

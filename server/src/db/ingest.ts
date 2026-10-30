@@ -4,7 +4,7 @@ import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuSchedul
 import { iso2, shortCountry } from '../domain/codes.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName, type Entry } from '../domain/normalize.js';
 import { parseRule } from '../domain/rules.js';
-import { isuLocalDate, localWallClockToUtc, utc, venueTimeZone } from '../domain/time.js';
+import { heatTimes, isuLocalDate, utc, venueTimeZone } from '../domain/time.js';
 
 type EventState = 'upcoming' | 'live' | 'finished';
 const EVENT_STATE: Record<string, EventState> = {
@@ -56,6 +56,9 @@ export class Ingest {
     const roundKeys = new Map<string, number>(); // competition + round name -> ours (unlinked schedules)
     const named: { title: string; label: string; roundId: number }[] = [];
 
+    // ISU's schedule times are real UTC; they tell us how to read the heat times.
+    const scheduled = new Map(tree.schedule.flatMap((si) => (si.event_result_round_id && utc(si.start_time)
+      ? [[si.event_result_round_id, utc(si.start_time)!] as const] : [])));
     for (const comp of tree.competitions) {
       const compId = await this.upsertCompetition(loaded.eventId, comp);
       const ids = await this.upsertRounds(compId, comp.rounds);
@@ -66,6 +69,7 @@ export class Ingest {
         named.push({ title: competitionName(comp.name, comp.gender, isRelay(comp)), label: roundName(rnd.name), roundId: rid });
         await this.loadHeats(rid, loaded.timeZone, rnd.heats, isRelay(comp), {
           round: roundName(rnd.name), eventFinished: eventState(tree.event.state) === 'finished',
+          scheduledAt: scheduled.get(rnd.event_result_round_id) ?? null,
         });
       }
     }
@@ -155,18 +159,24 @@ export class Ingest {
 
   /** Live polling: refresh one round's heats. */
   async loadRoundHeats(roundIsuId: number, heats: IsuHeat[], relay: boolean): Promise<void> {
-    const res = await this.db.query<{ id: number; name: string; time_zone: string; finished: boolean }>(
-      `select r.id, r.name, e.time_zone, e.state = 'finished' as finished from round r join competition c on c.id = r.competition_id
+    const res = await this.db.query<{ id: number; name: string; time_zone: string; finished: boolean; scheduled_at: Date | null }>(
+      `select r.id, r.name, e.time_zone, e.state = 'finished' as finished,
+         (select min(si.starts_at) from schedule_item si where si.round_id = r.id and si.source = 'isu') as scheduled_at
+       from round r join competition c on c.id = r.competition_id
        join event e on e.id = c.event_id where r.isu_id = $1`, [roundIsuId]);
     const row = res.rows[0];
-    if (row) await this.loadHeats(row.id, row.time_zone, heats, relay, { round: row.name, eventFinished: row.finished });
+    if (row) {
+      await this.loadHeats(row.id, row.time_zone, heats, relay,
+        { round: row.name, eventFinished: row.finished, scheduledAt: row.scheduled_at });
+    }
   }
 
   async loadHeats(
     roundId: number, tz: string, heats: IsuHeat[], relay: boolean,
-    opts: { round: string; eventFinished: boolean },
+    opts: { round: string; eventFinished: boolean; scheduledAt?: Date | null },
   ): Promise<void> {
     if (heats.length === 0) return;
+    const startOf = heatTimes(heats.map((h) => h.date), tz, opts.scheduledAt ?? null);
     // heat.date is the planned time until the heat starts, then the actual
     // start. Raced heats go first by actual time, then the rest by plan.
     const raceKey = (h: IsuHeat) => `${h.status === 'Scheduled' ? 1 : 0}|${h.date ?? ''}|${String(h.display_order).padStart(3, '0')}`;
@@ -177,7 +187,7 @@ export class Ingest {
     ], heats.map((h) => ({
       isu_id: h.event_result_round_heats_id, round_id: roundId,
       name: heatName(h.name, opts.round, h.display_order, heats.length), display_order: h.display_order,
-      run_order: order.indexOf(h) + 1, starts_at: localWallClockToUtc(h.date, tz)?.toISOString() ?? null,
+      run_order: order.indexOf(h) + 1, starts_at: startOf(h.date)?.toISOString() ?? null,
       state: heatState(h, opts.eventFinished), source_updated_at: utc(h.updated_at)?.toISOString() ?? null,
     })));
 

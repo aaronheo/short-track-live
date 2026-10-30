@@ -8,6 +8,7 @@ import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/pick
 import { parseRule } from '../src/domain/rules.js';
 import { WORLD_TOUR_POINTS, classifyStanding, genderOfSkaters, standingEventCity, standingPoints, titleCaseName } from '../src/domain/standings.js';
 import { summarize } from '../src/domain/summary.js';
+import { heatTimes } from '../src/domain/time.js';
 import { isConnectionError } from '../src/sync/worker.js';
 import { clock, dayLabel, lapsFor, localWallClockToUtc, millis, venueTimeZone, weekdayMonthDay } from '../src/domain/time.js';
 import { WORLDS, WT1_2026, placeHeats, round, standings2026, tree } from './fixtures.js';
@@ -384,3 +385,30 @@ describe('picks', () => {
     expect(cutLine({ name: 'Finals', auto_places: null, destination: null }, 'Final B')).toBeNull();
   });
 });
+
+describe('heatTimes', () => {
+  const read = (dates: string[], tz: string, scheduled: string | null) =>
+    dates.map((d) => heatTimes(dates, tz, scheduled ? new Date(scheduled) : null)(d)?.toISOString());
+
+  it('reads wall-clock heat times (Vancouver as first published)', () => {
+    expect(read(['2026-10-23T09:00:00.000Z'], 'America/Vancouver', '2026-10-23T16:12:00.000Z'))
+      .toEqual(['2026-10-23T16:00:00.000Z']);
+  });
+
+  it('reads real-UTC heat times (Montréal from late October 2026)', () => {
+    expect(read(['2026-10-30T13:54:00.000Z', '2026-10-30T13:30:00.000Z'], 'America/Toronto', '2026-10-30T13:30:00.000Z'))
+      .toEqual(['2026-10-30T13:54:00.000Z', '2026-10-30T13:30:00.000Z']);
+    // East of UTC: the wall-clock reading would start 9 hours before the schedule.
+    expect(read(['2026-11-20T03:05:00.000Z'], 'Asia/Seoul', '2026-11-20T03:00:00.000Z')).toEqual(['2026-11-20T03:05:00.000Z']);
+  });
+
+  it('prefers the reading that starts after the schedule, an hour apart', () => {
+    // Dordrecht (UTC+1): first heat 40 minutes after a 09:00 UTC schedule time, wall-clock.
+    expect(read(['2025-11-14T10:40:00.000Z'], 'Europe/Amsterdam', '2025-11-14T09:00:00.000Z')).toEqual(['2025-11-14T09:40:00.000Z']);
+  });
+
+  it('falls back to wall-clock without a schedule time', () => {
+    expect(read(['2025-10-09T07:21:00.000Z'], 'America/Toronto', null)).toEqual(['2025-10-09T11:21:00.000Z']);
+  });
+});
+

@@ -1,6 +1,8 @@
-// ISU time conventions (checked against WT1 Vancouver 2026):
-//   schedule start_time and round.date are real UTC;
-//   heat.date is the venue's wall-clock time with a fake "Z" suffix;
+// ISU time conventions:
+//   schedule start_time is real UTC;
+//   heat.date was the venue's wall-clock time with a fake "Z" suffix until
+//   late October 2026, when ISU switched to real UTC (rewriting Vancouver's
+//   heats after the event), so see heatTimes;
 //   event from_date/to_date are local midnights with a "Z" suffix.
 
 /**
@@ -59,6 +61,28 @@ export function localWallClockToUtc(s: string | null | undefined, tz: string): D
   let guess = naive - offsetMinutes(naive, tz) * 60000;
   guess = naive - offsetMinutes(guess, tz) * 60000;
   return new Date(guess);
+}
+
+/**
+ * How to read one round's heat.date values: real UTC, or wall-clock time in
+ * `tz`. A round's first heat starts at or just after ISU's schedule time, so
+ * the reading that puts it there wins. With no schedule time (older events),
+ * wall-clock, which is what ISU used then.
+ */
+export function heatTimes(dates: (string | null | undefined)[], tz: string, scheduledAt: Date | null) {
+  const wallClock = (s: string | null | undefined) => localWallClockToUtc(s, tz);
+  if (!scheduledAt) return wallClock;
+  const firstAfter = (read: (s: string | null | undefined) => Date | null) => {
+    const times = dates.map(read).filter((d): d is Date => d != null).map((d) => d.getTime());
+    return times.length ? Math.min(...times) - scheduledAt.getTime() : null;
+  };
+  const asUtc = firstAfter(utc);
+  const asWall = firstAfter(wallClock);
+  if (asUtc == null || asWall == null) return wallClock;
+  // Earlier than 15 minutes before the schedule isn't plausible; of the rest, the closer one.
+  const fits = (d: number) => d >= -15 * 60_000;
+  const useUtc = fits(asUtc) && (!fits(asWall) || asUtc <= asWall) || (!fits(asUtc) && !fits(asWall) && Math.abs(asUtc) < Math.abs(asWall));
+  return useUtc ? utc : wallClock;
 }
 
 /** "YYYY-MM-DD" of a local-midnight-with-Z ISU date. */
