@@ -128,7 +128,7 @@ private struct LiveEventCard: View {
                 Button { model.openRound(ice.roundId, event: live.event.slug) } label: {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("On the ice")
+                            Text(ice.isLive ? "On the ice" : "Up next")
                                 .font(.caption.weight(.semibold))
                                 .tracking(0.7)
                                 .textCase(.uppercase)

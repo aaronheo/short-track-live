@@ -158,13 +158,17 @@ export class Repo {
     return res.rows;
   }
 
-  /** The round on the ice at a live event: a running heat first, else a live round. */
+  /** The round on the ice at a live event, falling back to its next scheduled round. */
   async onTheIce(eventId: number): Promise<{ round_id: number } | null> {
     const res = await this.db.query<{ round_id: number }>(
       `select r.id as round_id from round r join competition c on c.id = r.competition_id
        left join heat h on h.round_id = r.id and h.state = 'running'
-       where c.event_id = $1 and (h.id is not null or r.state = 'live')
-       order by (h.id is null), r.starts_at desc nulls last limit 1`, [eventId]);
+       where c.event_id = $1 and (h.id is not null
+         or exists (select 1 from heat next where next.round_id = r.id and next.state in ('scheduled', 'start_list')))
+       order by
+         case when h.id is not null then 0 when r.state = 'live' then 1 else 2 end,
+         r.starts_at asc nulls last
+       limit 1`, [eventId]);
     return res.rows[0] ?? null;
   }
 }

@@ -16,7 +16,7 @@ export interface EventSummary {
   slug: string; name: string; shortName: string; series: string | null; city: string | null; countryName: string | null;
   iso2: string | null; startsOn: string; endsOn: string; state: State;
 }
-export interface OnTheIce { roundId: number; competition: string; round: string; heat: string | null; lap: string | null }
+export interface OnTheIce { roundId: number; competition: string; round: string; heat: string | null; lap: string | null; isLive: boolean }
 export interface EventsResponse {
   season: string; seasons: string[];
   live: (EventSummary & { day: number; days: number; onTheIce: OnTheIce | null }) | null;
@@ -183,6 +183,7 @@ export function onTheIce(view: RoundResponse): OnTheIce {
     roundId: view.round.id, competition: view.round.competition, round: view.round.name,
     heat: index ? `Heat ${index} of ${view.heats.length}` : null,
     lap: running?.lap ? `Lap ${running.lap.current} of ${running.lap.total ?? '?'}` : null,
+    isLive: running != null,
   };
 }
 

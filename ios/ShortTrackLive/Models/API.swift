@@ -38,6 +38,7 @@ struct OnTheIce: Decodable, Hashable, Sendable {
     let round: String
     let heat: String?
     let lap: String?
+    let isLive: Bool
 }
 
 /// The live event: an `EventSummary` plus where the event is at.
