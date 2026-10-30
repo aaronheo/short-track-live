@@ -5,7 +5,6 @@ struct EventsView: View {
     /// nil = the latest season.
     @State private var season: String?
     @State private var live = EventsView.load(season: nil)
-    @State private var showAll = false
 
     private static func load(season: String?) -> Live<EventsResponse> {
         Live("seasons/\(season.map(Fmt.seasonPath) ?? "current")/events") { _ in .seconds(60) }
@@ -45,7 +44,6 @@ struct EventsView: View {
                 set: { picked in
                     season = picked == data.seasons.first ? nil : picked
                     live = Self.load(season: season)
-                    showAll = false
                 }
             )) {
                 ForEach(data.seasons, id: \.self) { Text(Fmt.season($0)).tag($0) }
@@ -62,35 +60,11 @@ struct EventsView: View {
 
     @ViewBuilder
     private func lists(_ data: EventsResponse) -> some View {
-        let upcoming = data.events.filter { $0.state == .upcoming }
-        var finished = Array(data.events.filter { $0.state == .finished }.reversed())
-        // Mid-season with nothing on: the event that just finished comes first.
-        if data.live == nil, !upcoming.isEmpty, let latest = finished.first {
-            EventSection(title: "Latest results", events: [latest]) {}
-            let _ = finished.removeFirst()
-        }
-        if !upcoming.isEmpty {
-            EventSection(title: "Coming up", events: Array(upcoming)) {
-                if !finished.isEmpty {
-                    RowDivider()
-                    Button {
-                        withAnimation(.snappy) { showAll.toggle() }
-                    } label: {
-                        Text(showAll ? "Hide earlier events" : "All \(data.events.count) events this season")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.link)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                }
-            }
-        }
-        if upcoming.isEmpty || showAll, !finished.isEmpty {
-            EventSection(title: upcoming.isEmpty && data.live == nil ? "Events" : "Earlier this season", events: finished) {}
-                .transition(.opacity.combined(with: .move(edge: .top)))
-        }
         if data.events.isEmpty {
             ContentUnavailableView("No events yet", systemImage: "calendar",
                                    description: Text("ISU hasn't published events for this season."))
+        } else {
+            EventSection(title: "Events", events: data.events) {}
         }
     }
 }
@@ -236,6 +210,14 @@ private struct EventRow: View {
                     .foregroundStyle(Theme.muted)
             }
             Spacer(minLength: 8)
+            if event.state == .finished {
+                Text("Completed")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.horizontal, 8)
+                    .frame(height: 24)
+                    .background(Theme.segment, in: .capsule)
+            }
             Chevron()
         }
         .padding(.horizontal, 16)
