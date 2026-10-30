@@ -128,7 +128,9 @@ export class Picks {
     return {
       ...base,
       event: { slug: event.slug, name: shortEventName(event.name), city: event.city, state: event.state },
-      open: heats.filter((h) => OPEN.includes(h.state) && h.entries >= 2).slice(0, 12).map(summary),
+      // Once someone has made a pick, keep the heat in their editable picks
+      // rather than also offering it again in the next-pick queue.
+      open: heats.filter((h) => OPEN.includes(h.state) && h.entries >= 2 && !mine.has(h.id)).slice(0, 12).map(summary),
       mine: heats.filter((h) => mine.has(h.id)).reverse().map(summary),
       me: accountId ? { points: meRow?.points ?? 0, picked: mine.size, rank: meRow?.rank ?? null } : null,
       players: totals.size,
