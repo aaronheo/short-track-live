@@ -114,24 +114,22 @@ private struct PicksHomeView: View {
 
     @ViewBuilder
     private func signedInContent(_ home: PicksHome) -> some View {
+        // The server removes saved picks from `open`; keeping this guard here
+        // also makes the layout correct while an older response is on screen.
+        let open = home.open.filter { !$0.picked }
         if let me = home.me {
             scoreCard(me, players: home.players)
         }
         section("Pick now") {
-            if home.open.isEmpty {
+            if open.isEmpty {
                 Text("Start lists for quarterfinals, semifinals and finals come out the day before. They show up here.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .padding(16)
             } else {
-                rows(home.open) { race in
-                    if race.picked {
-                        Label("Picked", systemImage: "checkmark.circle.fill").labelStyle(.iconOnly)
-                            .font(.title3).foregroundStyle(Theme.positive)
-                    } else {
-                        Text("Pick").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
-                            .padding(.horizontal, 14).frame(height: 32).background(Theme.link, in: .capsule)
-                    }
+                rows(open) { _ in
+                    Text("Pick").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 14).frame(height: 32).background(Theme.link, in: .capsule)
                 }
             }
         }

@@ -21,7 +21,7 @@ struct LiveBadge: View {
         .foregroundStyle(.white)
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(Theme.live, in: .rect(cornerRadius: 6))
+        .background(Theme.live, in: .capsule)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Live")
     }

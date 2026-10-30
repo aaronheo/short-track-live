@@ -495,6 +495,7 @@ describe.skipIf(!url)('database + API', () => {
       const home = (await request(api()).get('/picks').set('X-Session', a).expect(200)).body;
       expect(home).toMatchObject({ signedIn: true, nickname: 'Ice Fan', event: { slug: WT1_2026 }, players: 2 });
       expect(home.mine.map((m: { heatId: number }) => m.heatId)).toEqual([id]);
+      expect(home.open.map((m: { heatId: number }) => m.heatId)).not.toContain(id);
       expect(home.open.length).toBeGreaterThan(0);
       expect(['Quarterfinals', 'Semifinals', 'Finals']).toContain(home.open[0].round);
       expect(home.open[0].timeZone).toBe('America/Vancouver');
