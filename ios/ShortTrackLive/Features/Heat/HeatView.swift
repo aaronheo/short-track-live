@@ -58,7 +58,7 @@ struct HeatView: View {
         case .official: "Official"
         case .unofficial: "Unofficial"
         case .running: nil
-        case .startList: "Start list"
+        case .startList: nil
         case .scheduled: "Scheduled"
         }
     }

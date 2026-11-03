@@ -54,8 +54,8 @@ export interface PickHeatView {
   /** How everyone picked: once you've picked, or once the race has started. */
   crowd: {
     picks: number;
-    /** Per entry: % who put them 1st, 2nd, … and % who picked a penalty. */
-    entries: { entryId: number; places: number[]; penalized: number }[];
+    /** Per entry: % who put them 1st, 2nd, …, picked a penalty, or picked an advancement. */
+    entries: { entryId: number; places: number[]; penalized: number; advanced: number }[];
     mostPicked: (PickInput & { share: number }) | null;
   } | null;
   /** Once official. */
@@ -176,28 +176,28 @@ export class Picks {
     const locksAt = await this.lockAt(h);
     const entries = (await this.db.query<{
       id: number; name: string; last: string; nation: string | null; iso2: string | null; start_position: number | null; helmet: number | null;
-      rank: number | null; status: string | null; time_text: string | null;
+      rank: number | null; status: string | null; qualification: string | null; time_text: string | null;
     }>(
       `select en.id, coalesce(s.first_name || ' ' || s.last_name, s.last_name, t.name) as name, coalesce(s.last_name, t.name) as last,
-         en.nation, n.iso2, en.start_position, case when en.skater_id is not null then en.bib end as helmet, en.rank, en.status, en.time_text
+         en.nation, n.iso2, en.start_position, case when en.skater_id is not null then en.bib end as helmet, en.rank, en.status, en.qualification, en.time_text
        from entry en left join skater s on s.id = en.skater_id left join relay_team t on t.id = en.team_id
        left join nation n on n.code = en.nation
        where en.heat_id = $1 order by en.start_position nulls last, en.id`, [heatId])).rows;
-    const picks = (await this.db.query<{ account_id: number; finish: string[]; penalized: string[] }>(
-      'select account_id, finish, penalized from pick where heat_id = $1', [heatId])).rows
-      .map((p) => ({ accountId: Number(p.account_id), finish: ids(p.finish), penalized: ids(p.penalized) }));
+    const picks = (await this.db.query<{ account_id: number; finish: string[]; penalized: string[]; advanced: string[] }>(
+      'select account_id, finish, penalized, advanced from pick where heat_id = $1', [heatId])).rows
+      .map((p) => ({ accountId: Number(p.account_id), finish: ids(p.finish), penalized: ids(p.penalized), advanced: ids(p.advanced) }));
     const mine = picks.find((p) => p.accountId === accountId);
     const locked = this.isLocked(h, locksAt);
     const official = h.state === 'official';
-    const results = entries.map((e) => ({ entryId: e.id, rank: e.rank, status: e.status }));
+    const results = entries.map((e) => ({ entryId: e.id, rank: e.rank, status: e.status, qualification: e.qualification }));
 
     let crowd: PickHeatView['crowd'] = null;
     if ((mine || locked) && picks.length) {
       const pct = (n: number) => Math.round((n / picks.length) * 100);
       const combos = new Map<string, { pick: PickInput; n: number }>();
       for (const p of picks) {
-        const key = `${p.finish.join(',')}|${[...p.penalized].sort().join(',')}`;
-        combos.set(key, { pick: { finish: p.finish, penalized: p.penalized }, n: (combos.get(key)?.n ?? 0) + 1 });
+        const key = `${p.finish.join(',')}|${[...p.penalized].sort().join(',')}|${[...p.advanced].sort().join(',')}`;
+        combos.set(key, { pick: { finish: p.finish, penalized: p.penalized, advanced: p.advanced }, n: (combos.get(key)?.n ?? 0) + 1 });
       }
       const top = [...combos.values()].sort((a, b) => b.n - a.n)[0]!;
       crowd = {
@@ -206,6 +206,7 @@ export class Picks {
           entryId: e.id,
           places: entries.map((_, i) => pct(picks.filter((p) => p.finish[i] === e.id).length)),
           penalized: pct(picks.filter((p) => p.penalized.includes(e.id)).length),
+          advanced: pct(picks.filter((p) => p.advanced.includes(e.id)).length),
         })),
         mostPicked: { ...top.pick, share: pct(top.n) },
       };
@@ -221,10 +222,10 @@ export class Picks {
       locksAt: locksAt?.toISOString() ?? null,
       cut: cutLine({ name: h.round, auto_places: h.auto_places, destination: h.destination }, h.name),
       entries: entries.map((e) => ({ entryId: e.id, name: e.name, last: e.last, nat: e.nation, iso2: e.iso2, start: e.start_position, helmet: e.helmet })),
-      myPick: mine ? { finish: mine.finish, penalized: mine.penalized } : null,
+      myPick: mine ? { finish: mine.finish, penalized: mine.penalized, advanced: mine.advanced } : null,
       crowd,
       result: official ? {
-        entries: entries.map((e) => ({ entryId: e.id, rank: e.rank, status: e.status, time: e.status ? null : e.time_text }))
+          entries: entries.map((e) => ({ entryId: e.id, rank: e.rank, status: e.status, time: e.status ? null : e.time_text }))
           .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)),
         score: mine ? scorePick(mine, results) : null,
       } : null,
@@ -241,9 +242,9 @@ export class Picks {
     const entryIds = (await this.db.query<{ id: number }>('select id from entry where heat_id = $1', [heatId])).rows.map((r) => Number(r.id));
     if (entryIds.length < 2 || !validPick(pick, entryIds)) return 'invalid';
     await this.db.query(
-      `insert into pick (account_id, heat_id, finish, penalized) values ($1, $2, $3, $4)
-       on conflict (account_id, heat_id) do update set finish = excluded.finish, penalized = excluded.penalized, updated_at = now()`,
-      [accountId, heatId, pick.finish, pick.penalized]);
+      `insert into pick (account_id, heat_id, finish, penalized, advanced) values ($1, $2, $3, $4, $5)
+       on conflict (account_id, heat_id) do update set finish = excluded.finish, penalized = excluded.penalized, advanced = excluded.advanced, updated_at = now()`,
+      [accountId, heatId, pick.finish, pick.penalized, pick.advanced]);
     return (await this.heat(heatId, accountId))!;
   }
 
@@ -265,19 +266,19 @@ export class Picks {
 
   /** Every pick at an event, scored where the heat is official. */
   private async scores(eventId: number) {
-    const picks = (await this.db.query<{ account_id: number; heat_id: number; finish: string[]; penalized: string[]; nickname: string | null; state: HeatState }>(
-      `select p.account_id, p.heat_id, p.finish, p.penalized, a.nickname, h.state
+    const picks = (await this.db.query<{ account_id: number; heat_id: number; finish: string[]; penalized: string[]; advanced: string[]; nickname: string | null; state: HeatState }>(
+      `select p.account_id, p.heat_id, p.finish, p.penalized, p.advanced, a.nickname, h.state
        from pick p join account a on a.id = p.account_id join heat h on h.id = p.heat_id
        join round r on r.id = h.round_id join competition c on c.id = r.competition_id
        where c.event_id = $1`, [eventId])).rows;
     const official = [...new Set(picks.filter((p) => p.state === 'official').map((p) => p.heat_id))];
     const results = new Map<number, ResultEntry[]>();
-    for (const r of (await this.db.query<{ id: number; heat_id: number; rank: number | null; status: string | null }>(
-      'select id, heat_id, rank, status from entry where heat_id = any($1)', [official])).rows) {
-      results.set(r.heat_id, [...(results.get(r.heat_id) ?? []), { entryId: Number(r.id), rank: r.rank, status: r.status }]);
+    for (const r of (await this.db.query<{ id: number; heat_id: number; rank: number | null; status: string | null; qualification: string | null }>(
+      'select id, heat_id, rank, status, qualification from entry where heat_id = any($1)', [official])).rows) {
+      results.set(r.heat_id, [...(results.get(r.heat_id) ?? []), { entryId: Number(r.id), rank: r.rank, status: r.status, qualification: r.qualification }]);
     }
     return picks.map((p) => {
-      const pick = { finish: ids(p.finish), penalized: ids(p.penalized) };
+      const pick = { finish: ids(p.finish), penalized: ids(p.penalized), advanced: ids(p.advanced) };
       return {
         accountId: Number(p.account_id), heatId: p.heat_id, nickname: p.nickname,
         score: p.state === 'official' ? scorePick(pick, results.get(p.heat_id) ?? []) : null,

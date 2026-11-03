@@ -11,7 +11,6 @@ import SwiftUI
 final class Live<Value: Decodable & Sendable> {
     private(set) var value: Value?
     private(set) var error: (any Error)?
-    private(set) var updatedAt: Date?
 
     let path: String
     @ObservationIgnored private let interval: (Value) -> Duration?
@@ -29,7 +28,6 @@ final class Live<Value: Decodable & Sendable> {
         self.client = .shared
         self.interval = { _ in nil }
         self.value = value
-        self.updatedAt = .now
     }
 
     func refresh() async {
@@ -39,7 +37,6 @@ final class Live<Value: Decodable & Sendable> {
             if let fresh = try await client.get(path, as: Value.self) {
                 withAnimation(.snappy) { value = fresh }
             }
-            updatedAt = .now
             error = nil
         } catch is CancellationError {
         } catch let err as URLError where err.code == .cancelled {

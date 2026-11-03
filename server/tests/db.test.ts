@@ -487,13 +487,13 @@ describe.skipIf(!url)('database + API', () => {
       expect(view.entries[0].start).toBe(1);
       expect(view.entries[0].helmet).toBeNull(); // relay teams do not have helmet covers
 
-      await request(api()).put(`/picks/heats/${id}`).set('X-Session', fresh).send({ finish: order, penalized: [] }).expect(409);
-      await request(api()).put(`/picks/heats/${id}`).set('X-Session', a).send({ finish: order.slice(1), penalized: [] }).expect(400);
+      await request(api()).put(`/picks/heats/${id}`).set('X-Session', fresh).send({ finish: order, penalized: [], advanced: [] }).expect(409);
+      await request(api()).put(`/picks/heats/${id}`).set('X-Session', a).send({ finish: order.slice(1), penalized: [], advanced: [] }).expect(400);
       const saved = (await request(api()).put(`/picks/heats/${id}`).set('X-Session', a)
-        .send({ finish: order.slice(0, -1), penalized: order.slice(-1) }).expect(200)).body;
-      expect(saved.myPick).toEqual({ finish: order.slice(0, -1), penalized: order.slice(-1) });
+        .send({ finish: order.slice(0, -1), penalized: order.slice(-1), advanced: [] }).expect(200)).body;
+      expect(saved.myPick).toEqual({ finish: order.slice(0, -1), penalized: order.slice(-1), advanced: [] });
       expect(saved.crowd).toMatchObject({ picks: 1, mostPicked: { share: 100 } });
-      await request(api()).put(`/picks/heats/${id}`).set('X-Session', b).send({ finish: [...order].reverse(), penalized: [] }).expect(200);
+      await request(api()).put(`/picks/heats/${id}`).set('X-Session', b).send({ finish: [...order].reverse(), penalized: [], advanced: [] }).expect(200);
       const crowd = (await request(api()).get(`/picks/heats/${id}`).set('X-Session', a).expect(200)).body.crowd;
       expect(crowd.picks).toBe(2);
       expect(crowd.entries[0].places[0]).toBe(50);
@@ -515,7 +515,7 @@ describe.skipIf(!url)('database + API', () => {
       const done = await heatOf('Quarterfinals', 'Heat 1', 'official');
       const entries = (await pool.query<{ id: string; rank: number | null }>(
         'select id, rank from entry where heat_id = $1 order by rank nulls last, id', [done.id])).rows.map((r) => Number(r.id));
-      await request(api()).put(`/picks/heats/${done.id}`).set('X-Session', a).send({ finish: entries, penalized: [] }).expect(409);
+      await request(api()).put(`/picks/heats/${done.id}`).set('X-Session', a).send({ finish: entries, penalized: [], advanced: [] }).expect(409);
       // A pick made before the race (inserted as if earlier): the exact result.
       const accountId = (await one<{ id: number }>("select id from account where google_sub = 'pick-a'")).id;
       await pool.query('insert into pick (account_id, heat_id, finish, penalized) values ($1, $2, $3, $4)', [accountId, done.id, entries, []]);

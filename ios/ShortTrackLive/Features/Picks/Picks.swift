@@ -38,6 +38,21 @@ struct PickSummary: Decodable, Sendable, Hashable, Identifiable {
 struct PickChoice: Codable, Sendable, Hashable {
     var finish: [Int]
     var penalized: [Int]
+    var advanced: [Int]
+
+    init(finish: [Int], penalized: [Int], advanced: [Int] = []) {
+        self.finish = finish
+        self.penalized = penalized
+        self.advanced = advanced
+    }
+
+    /// Picks saved before advancements existed have no `advanced`.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        finish = try c.decode([Int].self, forKey: .finish)
+        penalized = try c.decode([Int].self, forKey: .penalized)
+        advanced = try c.decodeIfPresent([Int].self, forKey: .advanced) ?? []
+    }
 }
 
 /// GET /picks/heats/:id
@@ -60,10 +75,12 @@ struct PickHeat: Decodable, Sendable {
             let entryId: Int
             /// % who put them 1st, 2nd, …
             let places: [Int]
-            /// % who picked a penalty.
+            /// % who picked a penalty or an advancement.
             let penalized: Int
+            /// Missing from servers before advancements.
+            let advanced: Int?
         }
-        struct Most: Decodable, Sendable { let finish: [Int]; let penalized: [Int]; let share: Int }
+        struct Most: Decodable, Sendable { let finish: [Int]; let penalized: [Int]; let advanced: [Int]?; let share: Int }
         let picks: Int
         let entries: [EntryShare]
         let mostPicked: Most?
@@ -72,7 +89,7 @@ struct PickHeat: Decodable, Sendable {
     struct Result: Decodable, Sendable {
         struct Entry: Decodable, Sendable, Hashable { let entryId: Int; let rank: Int?; let status: String?; let time: String? }
         struct Score: Decodable, Sendable {
-            struct Line: Decodable, Sendable, Hashable { let entryId: Int; let picked: Int?; let points: Int }
+            struct Line: Decodable, Sendable, Hashable { let entryId: Int; let picked: Int?; let special: String?; let points: Int }
             let points: Int
             let max: Int
             let entries: [Line]
@@ -101,24 +118,27 @@ struct PickHeat: Decodable, Sendable {
 
     /// Your pick, or the start order to begin from.
     var startingChoice: PickChoice {
-        myPick ?? PickChoice(finish: entries.map(\.entryId), penalized: [])
+        myPick ?? PickChoice(finish: entries.map(\.entryId), penalized: [], advanced: [])
     }
 }
 
 /// How the crowd's picks read for one skater: the most picked outcome.
 struct CrowdLine: Hashable, Sendable {
     let entryId: Int
-    /// 1-based place, or nil for a penalty.
+    /// 1-based place, or nil for a special outcome.
     let top: Int?
+    let special: String?
     let topShare: Int
-    /// % per place, then the penalty share last.
+    /// % per place, then penalty and advancement shares.
     let shares: [Int]
 
     init(_ share: PickHeat.Crowd.EntryShare) {
         entryId = share.entryId
-        shares = share.places + [share.penalized]
+        shares = share.places + [share.penalized, share.advanced ?? 0]
         let best = shares.enumerated().max { $0.element < $1.element || ($0.element == $1.element && $0.offset > $1.offset) }!
-        top = best.offset == share.places.count ? nil : best.offset + 1
+        top = best.offset >= share.places.count ? nil : best.offset + 1
+        special = best.offset == share.places.count ? "penalty"
+            : best.offset == share.places.count + 1 ? "advanced" : nil
         topShare = best.element
     }
 }

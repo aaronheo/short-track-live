@@ -1,11 +1,11 @@
 // Picks: guess the finishing order of a quarterfinal, semifinal or final, and
-// who gets penalized. 3 points for an exact place, 1 for one place off, 3 for
-// a penalty called right.
+// who gets penalized or advanced by the referee. 3 points for an exact place,
+// 1 for one place off, and 5 for a correctly called penalty or advancement.
 
 /** Rounds people can pick (not heats, repechages or relays' ranking finals). */
 export const PICKABLE_ROUNDS = ['Quarterfinals', 'Semifinals', 'Finals'];
 
-export const POINTS = { exact: 3, oneOff: 1, penalty: 3 } as const;
+export const POINTS = { exact: 3, oneOff: 1, penalty: 5, advanced: 5 } as const;
 
 /** ISU statuses that count as a penalty for picks: a penalty and both cards. */
 const PENALTIES = new Set(['PEN', 'YC', 'RC']);
@@ -15,14 +15,17 @@ export interface PickInput {
   finish: number[];
   /** Entry ids predicted to be penalized. */
   penalized: number[];
+  /** Entry ids predicted to be advanced by the referee. */
+  advanced: number[];
 }
 
-export interface ResultEntry { entryId: number; rank: number | null; status: string | null }
+export interface ResultEntry { entryId: number; rank: number | null; status: string | null; qualification?: string | null }
 
 export interface ScoredEntry {
   entryId: number;
-  /** 1-based predicted place, or null when predicted penalized. */
+  /** 1-based predicted place, or null for a special outcome. */
   picked: number | null;
+  special: 'penalty' | 'advanced' | null;
   points: number;
 }
 
@@ -34,19 +37,28 @@ export function scorePick(pick: PickInput, results: ResultEntry[]): Score {
     ...pick.finish.map((entryId, i) => {
       const rank = byId.get(entryId)?.rank ?? null;
       const off = rank == null ? null : Math.abs(rank - (i + 1));
-      return { entryId, picked: i + 1, points: off === 0 ? POINTS.exact : off === 1 ? POINTS.oneOff : 0 };
+      return { entryId, picked: i + 1, special: null, points: off === 0 ? POINTS.exact : off === 1 ? POINTS.oneOff : 0 };
     }),
     ...pick.penalized.map((entryId) => ({
-      entryId, picked: null,
+      entryId, picked: null, special: 'penalty' as const,
       points: PENALTIES.has(byId.get(entryId)?.status ?? '') ? POINTS.penalty : 0,
     })),
+    ...pick.advanced.map((entryId) => ({
+      entryId, picked: null, special: 'advanced' as const,
+      points: /^ADV/.test(byId.get(entryId)?.qualification ?? '') ? POINTS.advanced : 0,
+    })),
   ];
-  return { points: entries.reduce((sum, e) => sum + e.points, 0), max: results.length * POINTS.exact, entries };
+  const max = results.reduce((sum, result) => sum + (
+    PENALTIES.has(result.status ?? '') ? POINTS.penalty
+      : /^ADV/.test(result.qualification ?? '') ? POINTS.advanced
+        : POINTS.exact
+  ), 0);
+  return { points: entries.reduce((sum, e) => sum + e.points, 0), max, entries };
 }
 
-/** A pick must place or penalize every skater in the heat exactly once. */
+/** A pick must place, penalize, or advance every skater in the heat exactly once. */
 export function validPick(pick: PickInput, entryIds: number[]): boolean {
-  const all = [...pick.finish, ...pick.penalized];
+  const all = [...pick.finish, ...pick.penalized, ...pick.advanced];
   return all.length === entryIds.length && new Set(all).size === all.length && all.every((id) => entryIds.includes(id));
 }
 

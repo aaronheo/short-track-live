@@ -382,22 +382,26 @@ describe('picks', () => {
     { entryId: 5, rank: 4, status: null }, // Topolska
   ];
 
-  it('scores 3 for an exact place, 1 for one off, 3 for a penalty called right', () => {
+  it('scores 3 for an exact place, 1 for one off, and 5 for a penalty or advancement called right', () => {
     // The pick on the designs: Velzeboer, Sarault, Kim, Shim; Topolska penalized.
-    const s = scorePick({ finish: [2, 1, 4, 3], penalized: [5] }, results);
+    const s = scorePick({ finish: [2, 1, 4, 3], penalized: [5], advanced: [] }, results);
     expect(s.entries.map((e) => e.points)).toEqual([3, 1, 1, 1, 0]);
     expect(s).toMatchObject({ points: 6, max: 15 });
-    const pen = scorePick({ finish: [2, 4, 1, 5], penalized: [3] }, [...results.slice(0, 2), { entryId: 3, rank: null, status: 'YC' }, ...results.slice(3)]);
-    expect(pen.entries.at(-1)).toEqual({ entryId: 3, picked: null, points: 3 });
+    const pen = scorePick({ finish: [2, 4, 1, 5], penalized: [3], advanced: [] }, [...results.slice(0, 2), { entryId: 3, rank: null, status: 'YC' }, ...results.slice(3)]);
+    expect(pen.entries.at(-1)).toEqual({ entryId: 3, picked: null, special: 'penalty', points: 5 });
     // Someone actually penalized but picked to place scores 0 for them.
-    expect(scorePick({ finish: [3, 2, 4, 1, 5], penalized: [] }, [{ entryId: 3, rank: null, status: 'PEN' }, ...results.filter((r) => r.entryId !== 3)]).entries[0]!.points).toBe(0);
+    expect(scorePick({ finish: [3, 2, 4, 1, 5], penalized: [], advanced: [] }, [{ entryId: 3, rank: null, status: 'PEN' }, ...results.filter((r) => r.entryId !== 3)]).entries[0]!.points).toBe(0);
+    const advanced = scorePick({ finish: [2, 4, 1, 5], penalized: [], advanced: [3] }, [...results.slice(0, 2), { entryId: 3, rank: 5, status: null, qualification: 'ADV' }, ...results.slice(3)]);
+    expect(advanced.entries.at(-1)).toEqual({ entryId: 3, picked: null, special: 'advanced', points: 5 });
+    expect(advanced.max).toBe(17);
   });
 
-  it('needs every skater placed or penalized once', () => {
-    expect(validPick({ finish: [1, 2, 3, 4], penalized: [5] }, [1, 2, 3, 4, 5])).toBe(true);
-    expect(validPick({ finish: [1, 2, 3, 4], penalized: [] }, [1, 2, 3, 4, 5])).toBe(false);
-    expect(validPick({ finish: [1, 1, 3, 4, 5], penalized: [] }, [1, 2, 3, 4, 5])).toBe(false);
-    expect(validPick({ finish: [1, 2, 3, 4, 9], penalized: [] }, [1, 2, 3, 4, 5])).toBe(false);
+  it('needs every skater placed, penalized, or advanced once', () => {
+    expect(validPick({ finish: [1, 2, 3, 4], penalized: [5], advanced: [] }, [1, 2, 3, 4, 5])).toBe(true);
+    expect(validPick({ finish: [1, 2, 3, 4], penalized: [], advanced: [5] }, [1, 2, 3, 4, 5])).toBe(true);
+    expect(validPick({ finish: [1, 2, 3, 4], penalized: [], advanced: [] }, [1, 2, 3, 4, 5])).toBe(false);
+    expect(validPick({ finish: [1, 1, 3, 4, 5], penalized: [], advanced: [] }, [1, 2, 3, 4, 5])).toBe(false);
+    expect(validPick({ finish: [1, 2, 3, 4, 9], penalized: [], advanced: [] }, [1, 2, 3, 4, 5])).toBe(false);
   });
 
   it('cleans nicknames', () => {

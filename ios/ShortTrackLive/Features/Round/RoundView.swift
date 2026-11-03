@@ -29,7 +29,7 @@ struct RoundView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     RoundHeader(data: data, pick: switchRound)
-                    RoundBody(data: data, updatedAt: live.updatedAt, expanded: expandedBinding(data))
+                    RoundBody(data: data, expanded: expandedBinding(data))
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -171,7 +171,6 @@ private struct ProgressStrip: View {
 /// racing next on the right.
 private struct RoundBody: View {
     let data: RoundResponse
-    let updatedAt: Date?
     @Binding var expanded: Set<Int>
     @State private var width: CGFloat = 0
 
@@ -216,7 +215,7 @@ private struct RoundBody: View {
 
     @ViewBuilder private var racing: some View {
         if let running {
-            LiveHeatCard(heat: running, updatedAt: updatedAt)
+            LiveHeatCard(heat: running)
         }
         ForEach(Array(waiting.enumerated()), id: \.element.id) { index, heat in
             StartListCard(heat: heat, upNext: index == 0, venue: data.event.timeZone)

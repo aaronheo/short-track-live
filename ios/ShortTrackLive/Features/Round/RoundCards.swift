@@ -299,7 +299,6 @@ struct ResultRow: View {
 struct LiveHeatCard: View {
     @Environment(AppModel.self) private var model
     let heat: HeatBlock
-    let updatedAt: Date?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -310,7 +309,6 @@ struct LiveHeatCard: View {
                         .foregroundStyle(Theme.ink)
                     LiveBadge()
                     Spacer()
-                    if let updatedAt { UpdatedAgo(since: updatedAt) }
                     Chevron()
                 }
                 .padding(.horizontal, 16)
@@ -386,20 +384,6 @@ struct LiveHeatCard: View {
     }
 }
 
-/// "Updated 4s ago", ticking.
-private struct UpdatedAgo: View {
-    let since: Date
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text("Updated \(max(0, Int(context.date.timeIntervalSince(since))))s ago")
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundStyle(Theme.muted)
-        }
-    }
-}
-
 // MARK: - Start lists
 
 struct StartListCard: View {
@@ -417,9 +401,11 @@ struct StartListCard: View {
                     .font(.callout.weight(.bold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
-                Text(label)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
+                if let label {
+                    Text(label)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
             }
             .padding(.horizontal, 16)
             .frame(minHeight: 44)
@@ -460,8 +446,9 @@ struct StartListCard: View {
         .card()
     }
 
-    private var label: String {
-        let list = heat.state == .startList ? "Start list" : heat.startsAt.map { RaceTimes.clock($0, venue: venue, venueTime: venueTime) } ?? "Scheduled"
-        return upNext ? "Up next · \(list)" : list
+    private var label: String? {
+        let status = heat.startsAt.map { RaceTimes.clock($0, venue: venue, venueTime: venueTime) }
+            ?? (heat.state == .scheduled ? "Scheduled" : nil)
+        return upNext ? status.map { "Up next · \($0)" } ?? "Up next" : status
     }
 }

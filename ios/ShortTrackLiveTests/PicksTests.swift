@@ -24,7 +24,27 @@ struct PicksTests {
         let lines = heat.crowd!.entries.map(CrowdLine.init)
         #expect(lines.map(\.top) == [2, 1, nil]) // Topolska: a penalty is the most picked
         #expect(lines.map(\.topShare) == [50, 75, 50])
-        #expect(lines[2].shares == [0, 25, 25, 50])
+        #expect(lines[2].shares == [0, 25, 25, 50, 0])
+    }
+
+    @Test func readsAnAdvancementPick() throws {
+        let json = """
+        {"heatId":7,"event":"","title":"Men 1000 m","race":"Semifinal · Heat 1","startsAt":null,"locksAt":"2026-10-31T19:02:00.000Z",
+         "state":"start_list","locked":false,"cut":null,
+         "entries":[{"entryId":1,"name":"A","last":"A","nat":null,"iso2":null,"start":1},
+                    {"entryId":2,"name":"B","last":"B","nat":null,"iso2":null,"start":2}],
+         "myPick":{"finish":[1],"penalized":[],"advanced":[2]},
+         "crowd":{"picks":2,"entries":[{"entryId":1,"places":[100,0],"penalized":0,"advanced":0},
+                                      {"entryId":2,"places":[0,0],"penalized":0,"advanced":100}],
+                  "mostPicked":{"finish":[1],"penalized":[],"advanced":[2],"share":100}},
+         "result":null}
+        """
+        let heat = try JSONDecoder.api.decode(PickHeat.self, from: Data(json.utf8))
+        #expect(heat.startingChoice == PickChoice(finish: [1], penalized: [], advanced: [2]))
+        #expect(heat.locksAt != nil)
+        let lines = heat.crowd!.entries.map(CrowdLine.init)
+        #expect(lines[1].top == nil && lines[1].special == "advanced")
+        #expect(lines[0].special == nil && lines[0].top == 1)
     }
 
     @Test func startsFromTheStartOrder() throws {

@@ -83,11 +83,11 @@ Tapping a skater shows their place, points and gap to 1st, and their points by d
 
 ### Picks
 
-Before each quarterfinal, semifinal and final, signed-in people put the skaters in the order they think they'll finish, starting from the start order, and can mark any as penalized. Picks lock when the race starts (the heat stops being a start list). After picking, or once the race starts, everyone's picks show per skater: the most picked place or penalty, with a bar for each. When the result is official a pick scores 3 for an exact place, 1 for one place off and 3 for a penalty (or card) called right; scores are worked out when read, so a corrected result rescores. The Picks tab shows the live (or next) event's open races, your picks and the leaderboard. Leaderboards use a nickname, chosen at the first pick and changeable in Account; the race chat will use it too.
+Before each quarterfinal, semifinal and final, signed-in people put the skaters in the order they think they'll finish, starting from the start order, and can mark any as penalized or advanced by the referee. Picks lock when the race two places before it in the running order begins, so nobody picks with a look at the warm-up; the first race after a break of 10 minutes or more locks 3 minutes before its own start instead (`locksAt` in the API). A race that has started is always locked. After picking, or once the race starts, everyone's picks show per skater: the most picked place, penalty, or advancement, with a bar for each. When the result is official a pick scores 3 for an exact place, 1 for one place off and 5 for a penalty, card, or referee advancement called right; scores are worked out when read, so a corrected result rescores. The Picks tab shows the live (or next) event's open races you haven't picked yet, your picks, and your score card, which opens the leaderboard. Leaderboards use a nickname, chosen at the first pick and changeable in Account; the race chat will use it too.
 
 Skaters qualify into each round, so a round can only be picked once its start lists are out. The app checks `GET /picks` with the race alerts and sends one "Picks are open" notification per round (tap opens the race in Picks). It's a local notification, so with the app closed it comes at the next background refresh. Profile → Notifications → Picks are open turns it off (saved to the account).
 
-API: `GET /picks`, `GET /picks/heats/:id`, `PUT /picks/heats/:id { finish, penalized }` (entry ids), `PUT /me/nickname`. Stored in `pick` and `account.nickname`.
+API: `GET /picks`, `GET /picks/heats/:id`, `PUT /picks/heats/:id { finish, penalized, advanced }` (entry ids), `PUT /me/nickname`. Stored in `pick` and `account.nickname`.
 
 ### Accounts (Sign in with Google)
 

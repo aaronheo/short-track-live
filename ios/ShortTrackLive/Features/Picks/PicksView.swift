@@ -53,6 +53,7 @@ private struct PicksHomeView: View {
     @Environment(\.scenePhase) private var phase
     @State private var home: PicksHome?
     @State private var failed = false
+    @State private var showingLeaderboard = false
 
     var body: some View {
         ScrollView {
@@ -74,6 +75,9 @@ private struct PicksHomeView: View {
         .background(Theme.ground)
         .navigationTitle("Picks")
         .navigationBarTitleDisplayMode(split ? .inline : .large)
+        .navigationDestination(isPresented: $showingLeaderboard) {
+            PicksLeaderboardView(event: home?.event, leaderboard: home?.leaderboard ?? [])
+        }
         .refreshable { await load() }
         // Reload on signing in or out, and every 30 s while on screen.
         .task(id: "\(account.signedIn)-\(phase == .active)") {
@@ -118,7 +122,11 @@ private struct PicksHomeView: View {
         // also makes the layout correct while an older response is on screen.
         let open = home.open.filter { !$0.picked }
         if let me = home.me {
-            scoreCard(me, players: home.players)
+            Button { showingLeaderboard = true } label: {
+                scoreCard(me, players: home.players)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the leaderboard")
         }
         section("Pick now") {
             if open.isEmpty {
@@ -138,22 +146,6 @@ private struct PicksHomeView: View {
                 rows(home.mine) { race in badge(race) }
             }
         }
-        if !home.leaderboard.isEmpty {
-            section("Leaderboard") {
-                ForEach(Array(home.leaderboard.enumerated()), id: \.element) { index, row in
-                    if index > 0 { RowDivider(leading: 16) }
-                    HStack(spacing: 12) {
-                        Text("\(row.rank)").font(.condensed(.headline)).foregroundStyle(Theme.muted).frame(width: 28)
-                        Text(row.nickname).font(.callout.weight(row.me ? .bold : .medium)).foregroundStyle(Theme.ink)
-                        Spacer()
-                        Text("\(row.points)").font(.condensed(.title3)).monospacedDigit().foregroundStyle(Theme.ink)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 46)
-                    .background(row.me ? Theme.link.opacity(0.08) : .clear)
-                }
-            }
-        }
     }
 
     private func scoreCard(_ me: PicksHome.Me, players: Int) -> some View {
@@ -161,10 +153,15 @@ private struct PicksHomeView: View {
             stat("\(me.points)", "Points")
             stat(me.rank.map(Fmt.ordinal) ?? "–", players > 0 ? "of \(players)" : "Rank")
             stat("\(me.picked)", "Picked")
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(Theme.heroMuted)
+                .padding(.trailing, 16)
         }
         .padding(.vertical, 16)
         .foregroundStyle(.white)
         .background(Theme.hero, in: .rect(cornerRadius: 20))
+        .contentShape(.rect)
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
@@ -231,6 +228,57 @@ private struct PicksHomeView: View {
     }
 }
 
+/// The event-wide points table, reached from the score summary at the top of Picks.
+private struct PicksLeaderboardView: View {
+    let event: PicksHome.Event?
+    let leaderboard: [PicksHome.Leader]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                if let event {
+                    Text([event.name, event.city].compactMap { $0 }.joined(separator: ", "))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
+                        .padding(.leading, 4)
+                        .padding(.bottom, 8)
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(Array(leaderboard.enumerated()), id: \.element) { index, row in
+                        if index > 0 { RowDivider(leading: 16) }
+                        HStack(spacing: 12) {
+                            Text("\(row.rank)")
+                                .font(.condensed(.headline))
+                                .foregroundStyle(Theme.muted)
+                                .frame(width: 28)
+                            Text(row.nickname)
+                                .font(.callout.weight(row.me ? .bold : .medium))
+                                .foregroundStyle(Theme.ink)
+                            Spacer()
+                            Text("\(row.points)")
+                                .font(.condensed(.title3))
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 52)
+                        .background(row.me ? Theme.link.opacity(0.08) : .clear)
+                    }
+                }
+                .card()
+                .clipShape(.rect(cornerRadius: 16))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
+        }
+        .scrollIndicators(.hidden)
+        .background(Theme.ground)
+        .navigationTitle("Leaderboard")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 // MARK: - One race
 
 /// Pick the order, see how everyone picked, and your score once it's official.
@@ -239,7 +287,7 @@ struct PickView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.scenePhase) private var phase
     @State private var heat: PickHeat?
-    @State private var choice = PickChoice(finish: [], penalized: [])
+    @State private var choice = PickChoice(finish: [], penalized: [], advanced: [])
     @State private var saving = false
     @State private var message: String?
     @State private var askNickname = false
@@ -331,6 +379,7 @@ struct PickView: View {
             } else {
                 orderSection(heat)
                 if !choice.penalized.isEmpty { penaltySection(heat) }
+                if !choice.advanced.isEmpty { advancedSection(heat) }
             }
             if crowdToo { crowdSection(heat) }
         }
@@ -364,10 +413,8 @@ struct PickView: View {
         Section {
             ForEach(Array(choice.finish.enumerated()), id: \.element) { index, id in
                 if let entry = heat.entry(id) {
-                    PickRow(place: index + 1, entry: entry, penalized: false, locked: heat.locked,
-                            cutAbove: heat.cut.flatMap { $0.after == index && index > 0 ? $0.label : nil }) {
-                        togglePenalty(id)
-                    }
+                    PickRow(place: index + 1, entry: entry, outcome: .place(index + 1), locked: heat.locked,
+                            cutAbove: heat.cut.flatMap { $0.after == index && index > 0 ? $0.label : nil }) { setSpecial(id, $0) }
                 }
             }
             .onMove { from, to in
@@ -378,7 +425,7 @@ struct PickView: View {
             Text(heat.locked ? "Your pick" : "Finishing order")
         } footer: {
             if !heat.locked {
-                Text("Starts in start order. Drag to change it. PEN moves a skater to the penalties. 3 points for an exact place, 1 for one place off, 3 for a penalty called right.")
+                Text("Starts in start order. Drag to change it. PEN or ADV moves a skater to that outcome. 3 points for an exact place, 1 for one place off, and 5 for a correct penalty or advancement.")
             }
         }
     }
@@ -387,21 +434,37 @@ struct PickView: View {
         Section("Penalized") {
             ForEach(choice.penalized, id: \.self) { id in
                 if let entry = heat.entry(id) {
-                    PickRow(place: nil, entry: entry, penalized: true, locked: heat.locked, cutAbove: nil) { togglePenalty(id) }
+                    PickRow(place: nil, entry: entry, outcome: .penalty, locked: heat.locked, cutAbove: nil) { setSpecial(id, $0) }
                         .moveDisabled(true)
                 }
             }
         }
     }
 
-    private func togglePenalty(_ id: Int) {
+    private func advancedSection(_ heat: PickHeat) -> some View {
+        Section("Advanced") {
+            ForEach(choice.advanced, id: \.self) { id in
+                if let entry = heat.entry(id) {
+                    PickRow(place: nil, entry: entry, outcome: .advanced, locked: heat.locked, cutAbove: nil) { setSpecial(id, $0) }
+                        .moveDisabled(true)
+                }
+            }
+        }
+    }
+
+    private func setSpecial(_ id: Int, _ outcome: PickOutcome) {
         withAnimation(.snappy) {
-            if let i = choice.penalized.firstIndex(of: id) {
-                choice.penalized.remove(at: i)
+            choice.penalized.removeAll { $0 == id }
+            choice.advanced.removeAll { $0 == id }
+            switch outcome {
+            case .place:
                 choice.finish.append(id)
-            } else {
+            case .penalty:
                 choice.finish.removeAll { $0 == id }
                 choice.penalized.append(id)
+            case .advanced:
+                choice.finish.removeAll { $0 == id }
+                choice.advanced.append(id)
             }
         }
     }
@@ -433,7 +496,7 @@ struct PickView: View {
                                 Text(entry.name).font(.callout.weight(.semibold)).lineLimit(1)
                                 HelmetBadge(number: entry.helmet)
                             }
-                            Text([line.time, mine.map { "You: \(Fmt.pickPlace($0.picked))" }].compactMap { $0 }.joined(separator: " · "))
+                            Text([line.time, mine.map { "You: \(pickOutcome($0.picked, special: $0.special))" }].compactMap { $0 }.joined(separator: " · "))
                                 .font(.footnote).foregroundStyle(Theme.muted)
                         }
                         Spacer()
@@ -469,7 +532,8 @@ struct PickView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Most picked order").font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted)
                         Text((most.finish.compactMap { heat.entry($0)?.last } .joined(separator: ", "))
-                             + (most.penalized.isEmpty ? "" : " · " + most.penalized.compactMap { heat.entry($0)?.last }.joined(separator: ", ") + " penalized"))
+                             + (most.penalized.isEmpty ? "" : " · " + most.penalized.compactMap { heat.entry($0)?.last }.joined(separator: ", ") + " penalized")
+                             + ((most.advanced ?? []).isEmpty ? "" : " · " + (most.advanced ?? []).compactMap { heat.entry($0)?.last }.joined(separator: ", ") + " advanced"))
                             .font(.callout.weight(.semibold))
                         Text("\(most.share)% of picks").font(.footnote).foregroundStyle(Theme.muted)
                     }
@@ -478,16 +542,23 @@ struct PickView: View {
             } header: {
                 HStack { Text("How everyone picked"); Spacer(); Text("\(crowd.picks) pick\(crowd.picks == 1 ? "" : "s")") }
             } footer: {
-                Text("Bars show how many people picked each place, or a penalty. Your pick is in blue. Tap a skater for the numbers.")
+                Text("Bars show how many people picked each place, a penalty, or an advancement. Your pick is in blue. Tap a skater for the numbers.")
             }
         }
     }
 
-    /// Your pick for this skater: 1-based place, 0 for a penalty, nil if you didn't pick.
-    private func myOutcome(_ id: Int, _ heat: PickHeat) -> Int? {
+    /// Your pick for this skater, if there is one.
+    private func myOutcome(_ id: Int, _ heat: PickHeat) -> PickOutcome? {
         guard let pick = heat.myPick else { return nil }
-        if pick.penalized.contains(id) { return 0 }
-        return pick.finish.firstIndex(of: id).map { $0 + 1 }
+        if pick.penalized.contains(id) { return .penalty }
+        if pick.advanced.contains(id) { return .advanced }
+        return pick.finish.firstIndex(of: id).map(PickOutcome.place)
+    }
+
+    private func pickOutcome(_ place: Int?, special: String?) -> String {
+        if special == "advanced" { return "Advanced" }
+        if special == "penalty" { return "Penalty" }
+        return Fmt.pickPlace(place)
     }
 
     // MARK: Bottom bar
@@ -519,14 +590,20 @@ struct PickView: View {
     }
 }
 
+private enum PickOutcome: Equatable {
+    case place(Int)
+    case penalty
+    case advanced
+}
+
 private struct PickRow: View {
     let place: Int?
     let entry: PickHeat.Entry
-    let penalized: Bool
+    let outcome: PickOutcome
     let locked: Bool
     /// Draw the cut line above this row ("To the final").
     let cutAbove: String?
-    let togglePenalty: () -> Void
+    let setSpecial: (PickOutcome) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -534,8 +611,15 @@ private struct PickRow: View {
                 if let place {
                     Text("\(place)").font(.condensed(.title3)).foregroundStyle(Theme.link)
                 } else {
-                    RoundedRectangle(cornerRadius: 2).fill(Theme.yellowCard).frame(width: 12, height: 16).rotationEffect(.degrees(8))
-                        .accessibilityLabel("Penalized")
+                    switch outcome {
+                    case .penalty:
+                        RoundedRectangle(cornerRadius: 2).fill(Theme.yellowCard).frame(width: 12, height: 16).rotationEffect(.degrees(8))
+                            .accessibilityLabel("Penalized")
+                    case .advanced:
+                        Image(systemName: "arrow.up.circle.fill").foregroundStyle(Theme.link).accessibilityLabel("Advanced")
+                    case .place:
+                        EmptyView()
+                    }
                 }
             }
             .frame(width: 26)
@@ -551,16 +635,26 @@ private struct PickRow: View {
             }
             Spacer(minLength: 6)
             if !locked {
-                Button(action: togglePenalty) {
+                Button { setSpecial(outcome == .penalty ? .place(0) : .penalty) } label: {
                     Text("PEN").font(.caption.weight(.bold))
-                        .foregroundStyle(penalized ? Color(hex: 0x3A2E00) : Theme.muted)
+                        .foregroundStyle(outcome == .penalty ? Color(hex: 0x3A2E00) : Theme.muted)
                         .padding(.horizontal, 10).frame(height: 30)
-                        .background(penalized ? Theme.yellowCard : .clear, in: .capsule)
-                        .overlay(Capsule().strokeBorder(penalized ? Theme.yellowCard : Theme.border, lineWidth: 1.5))
+                        .background(outcome == .penalty ? Theme.yellowCard : .clear, in: .capsule)
+                        .overlay(Capsule().strokeBorder(outcome == .penalty ? Theme.yellowCard : Theme.border, lineWidth: 1.5))
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Penalty for \(entry.name)")
-                .accessibilityAddTraits(penalized ? .isSelected : [])
+                .accessibilityAddTraits(outcome == .penalty ? .isSelected : [])
+                Button { setSpecial(outcome == .advanced ? .place(0) : .advanced) } label: {
+                    Text("ADV").font(.caption.weight(.bold))
+                        .foregroundStyle(outcome == .advanced ? .white : Theme.muted)
+                        .padding(.horizontal, 10).frame(height: 30)
+                        .background(outcome == .advanced ? Theme.link : .clear, in: .capsule)
+                        .overlay(Capsule().strokeBorder(outcome == .advanced ? Theme.link : Theme.border, lineWidth: 1.5))
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Advanced for \(entry.name)")
+                .accessibilityAddTraits(outcome == .advanced ? .isSelected : [])
             }
         }
         .frame(minHeight: 50)
@@ -586,8 +680,8 @@ private struct PickRow: View {
 private struct CrowdRow: View {
     let entry: PickHeat.Entry
     let line: CrowdLine
-    /// Your pick: place, 0 = penalty, nil = none.
-    let mine: Int?
+    /// Your pick, if any.
+    let mine: PickOutcome?
     let places: Int
     @State private var open = false
 
@@ -602,21 +696,28 @@ private struct CrowdRow: View {
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("MOST PICKED").font(.caption2.weight(.semibold)).foregroundStyle(Theme.muted)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(Fmt.pickPlace(line.top)).font(.condensed(.title3))
-                                .foregroundStyle(line.top == nil ? Color(hex: 0x8A6400) : Theme.ink)
+                            Text(line.special == "advanced" ? "Advanced" : line.special == "penalty" ? "Penalty" : Fmt.pickPlace(line.top)).font(.condensed(.title3))
+                                .foregroundStyle(line.special == "penalty" ? Color(hex: 0x8A6400) : line.special == "advanced" ? Theme.link : Theme.ink)
                             Text("\(line.topShare)%").font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted)
                         }
                     }
                 }
                 HStack(alignment: .bottom, spacing: 5) {
                     ForEach(Array(line.shares.enumerated()), id: \.offset) { i, share in
-                        let isPen = i == line.shares.count - 1
-                        let isMine = mine.map { $0 == 0 ? isPen : $0 == i + 1 } ?? false
+                        let isPenalty = i == line.shares.count - 2
+                        let isAdvanced = i == line.shares.count - 1
+                        let isMine = mine.map {
+                            switch $0 {
+                            case let .place(place): return !isPenalty && !isAdvanced && place == i + 1
+                            case .penalty: return isPenalty
+                            case .advanced: return isAdvanced
+                            }
+                        } ?? false
                         VStack(spacing: 2) {
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(isMine ? Theme.link : isPen ? Theme.yellowCard.opacity(0.7) : Theme.link.opacity(0.18))
+                                .fill(isMine ? Theme.link : isPenalty ? Theme.yellowCard.opacity(0.7) : isAdvanced ? Theme.link.opacity(0.55) : Theme.link.opacity(0.18))
                                 .frame(height: max(3, CGFloat(share) / CGFloat(max(line.topShare, 1)) * 26))
-                            Text(isPen ? "PEN" : Fmt.ordinal(i + 1)).font(.caption2.weight(isMine ? .bold : .regular))
+                            Text(isPenalty ? "PEN" : isAdvanced ? "ADV" : Fmt.ordinal(i + 1)).font(.caption2.weight(isMine ? .bold : .regular))
                                 .foregroundStyle(isMine ? Theme.link : Theme.muted)
                             if open { Text("\(share)%").font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Theme.ink) }
                         }

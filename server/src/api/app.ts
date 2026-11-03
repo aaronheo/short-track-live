@@ -227,7 +227,7 @@ export function createApp(db: Db, opts: AppOptions = {}) {
 
   // Picks are for signed-in people only; picking also needs a nickname. Signed
   // out, GET /picks says so and nothing more.
-  // PUT /picks/heats/:id { finish: [entry ids], penalized: [entry ids] }
+  // PUT /picks/heats/:id { finish: [entry ids], penalized: [entry ids], advanced: [entry ids] }
   const picks = new Picks(db, now);
   app.get('/picks', wrap(async (req, res) => {
     const token = sessionOf(req);
@@ -243,12 +243,13 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     const list = (v: unknown) => (Array.isArray(v) && v.every((x) => Number.isInteger(x)) ? (v as number[]) : null);
     const finish = list(req.body?.finish);
     const penalized = list(req.body?.penalized ?? []);
-    if (!finish || !penalized) return res.status(400).json({ error: 'Send finish and penalized as entry ids.' });
-    const result = await picks.save(accountId, Number(req.params.id), { finish, penalized });
+    const advanced = list(req.body?.advanced ?? []);
+    if (!finish || !penalized || !advanced) return res.status(400).json({ error: 'Send finish, penalized, and advanced as entry ids.' });
+    const result = await picks.save(accountId, Number(req.params.id), { finish, penalized, advanced });
     if (result === 'not_found') return res.status(404).json({ error: 'Picks are for quarterfinals, semifinals and finals.' });
     if (result === 'locked') return res.status(409).json({ error: 'Picks are locked for this race.', locked: true });
     if (result === 'needs_nickname') return res.status(409).json({ error: 'Choose a nickname first.', needsNickname: true });
-    if (result === 'invalid') return res.status(400).json({ error: 'Place or penalize every skater once.' });
+    if (result === 'invalid') return res.status(400).json({ error: 'Place, penalize, or advance every skater once.' });
     res.json(result);
   }));
 
