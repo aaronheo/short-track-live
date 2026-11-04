@@ -20,6 +20,11 @@ targets:
     configFiles:
       Debug: Config/App.xcconfig
       Release: Config/App.xcconfig
+    entitlements:
+      path: ShortTrackLive/ShortTrackLive.entitlements
+      properties:
+        # Xcode switches this to production when exporting for TestFlight.
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aaronheo.shorttracklive

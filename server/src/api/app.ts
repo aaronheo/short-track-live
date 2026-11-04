@@ -9,6 +9,7 @@ import { Accounts, cleanSettings, parseFavorites, type VerifyGoogle } from './ac
 import { Athletes, type RaceFilters } from './athletes.js';
 import { Favorites } from './favorites.js';
 import { Picks } from './picks.js';
+import { validToken, type PushDevices } from '../push/devices.js';
 import { Repo } from './repo.js';
 import { Standings } from './standings.js';
 import { dayOfEvent, eventSummary, heatView, onTheIce, roundView, scheduleView, type EventsResponse } from './views.js';
@@ -28,6 +29,8 @@ export interface AppOptions {
   chatPerHour?: number;
   /** Sign in with Google; unset when there's no GOOGLE_CLIENT_ID. */
   google?: VerifyGoogle | null;
+  /** Server push; unset or disabled when there's no APNs key. */
+  push?: PushDevices | null;
 }
 
 /**
@@ -251,6 +254,33 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     if (result === 'needs_nickname') return res.status(409).json({ error: 'Choose a nickname first.', needsNickname: true });
     if (result === 'invalid') return res.status(400).json({ error: 'Place, penalize, or advance every skater once.' });
     res.json(result);
+  }));
+
+  // Push. PUT /devices/:token { environment, favorites: [{ id, addedAt }],
+  // notifyStarts, notifyResults, notifyPicks }, with X-Session when signed in
+  // (for picks alerts). { push: false } means the server can't send, so the
+  // phone keeps doing its alerts itself.
+  app.put('/devices/:token', express.json({ limit: '64kb' }), wrap(async (req, res) => {
+    const token = String(req.params.token);
+    if (!validToken(token)) return res.status(400).json({ error: 'Not a device token.' });
+    if (!opts.push?.enabled) return res.json({ push: false });
+    const environment = req.body?.environment;
+    const favorites = parseFavorites(req.body?.favorites ?? []);
+    if ((environment !== 'sandbox' && environment !== 'production') || !favorites) {
+      return res.status(400).json({ error: 'Send environment (sandbox or production) and favorites as [{ id, addedAt }].' });
+    }
+    const session = sessionOf(req);
+    const accountId = session ? await accounts.fromToken(session) : null;
+    const flag = (v: unknown) => v !== false;
+    await opts.push.register({
+      token, environment, favorites, accountId,
+      starts: flag(req.body?.notifyStarts), results: flag(req.body?.notifyResults), picks: flag(req.body?.notifyPicks),
+    }, now());
+    res.json({ push: true });
+  }));
+  app.delete('/devices/:token', wrap(async (req, res) => {
+    if (opts.push && validToken(String(req.params.token))) await opts.push.remove(String(req.params.token));
+    res.status(204).end();
   }));
 
   // Ask. Body: { messages: [{ role: 'user' | 'assistant', content }] }, the

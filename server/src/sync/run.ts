@@ -3,6 +3,8 @@ import path from 'node:path';
 import { createPool } from '../db/pool.js';
 import { IsuClient } from '../isu/client.js';
 import { IsuRecorder } from '../isu/recorder.js';
+import { PushDevices } from '../push/devices.js';
+import type { PushSender } from '../push/apns.js';
 import { SyncWorker } from './worker.js';
 
 /**
@@ -11,14 +13,18 @@ import { SyncWorker } from './worker.js';
  *                            (resumable; stops when the database reaches BACKFILL_MAX_DB_MB, default 400)
  * npm run sync               backfill (skips complete events), then poll live events forever
  */
-export async function startSync(opts: { backfillOnly?: boolean; allHistory?: boolean } = {}) {
+export async function startSync(opts: { backfillOnly?: boolean; allHistory?: boolean; push?: PushSender | null } = {}) {
   const pool = createPool();
   // Live events' ISU responses go to isu_recording unless ISU_RECORD=0.
   const isu = new IsuClient({
     cacheDir: path.resolve(process.env.ISU_CACHE_DIR ?? '.cache/isu'),
     recorder: process.env.ISU_RECORD === '0' ? undefined : new IsuRecorder(pool),
   });
-  const worker = new SyncWorker(isu, pool);
+  const worker = new SyncWorker(isu, pool, undefined, {
+    push: opts.push ? new PushDevices(pool, opts.push) : null,
+    // Render sets this to the service's public URL.
+    keepAwakeUrl: process.env.RENDER_EXTERNAL_URL ?? null,
+  });
   const { current, previous } = await worker.seasons();
   if (opts.allHistory) {
     await worker.backfill(await worker.allSeasons(), { maxDbBytes: Number(process.env.BACKFILL_MAX_DB_MB ?? 400) * 1e6 });

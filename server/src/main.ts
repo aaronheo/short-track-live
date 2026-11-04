@@ -4,6 +4,8 @@ import { Chat } from './chat/chat.js';
 import { createPool } from './db/pool.js';
 import { createApp } from './api/app.js';
 import { googleVerifier } from './api/accounts.js';
+import { Apns, apnsConfigFromEnv } from './push/apns.js';
+import { PushDevices } from './push/devices.js';
 import { startSync } from './sync/run.js';
 
 // API and sync worker in one process: `npm run dev` locally, `npm start` on Render.
@@ -25,8 +27,13 @@ console.log(process.env.OPENAI_API_KEY
 const googleIds = (process.env.GOOGLE_CLIENT_ID ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const google = googleIds.length ? googleVerifier(googleIds) : null;
 const replayHeat = process.env.REPLAY_HEAT ? Number(process.env.REPLAY_HEAT) : null;
-createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google }).listen(port, () => console.log(`API on http://localhost:${port}`));
-startSync().catch((err) => {
+// Server push needs APNS_KEY, APNS_KEY_ID and APNS_TEAM_ID; without them the phone does its own alerts.
+const apnsConfig = apnsConfigFromEnv();
+const apns = apnsConfig ? new Apns(apnsConfig) : null;
+console.log(apns ? 'Push: on' : 'Push: off, APNS_KEY / APNS_KEY_ID / APNS_TEAM_ID are not set');
+createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google, push: new PushDevices(pool, apns) })
+  .listen(port, () => console.log(`API on http://localhost:${port}`));
+startSync({ push: apns }).catch((err) => {
   console.error(err);
   process.exit(1);
 });

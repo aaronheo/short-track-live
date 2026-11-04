@@ -4,6 +4,7 @@ import { competitionName, roundName } from '../domain/normalize.js';
 import { isuLocalDate } from '../domain/time.js';
 import { isRelay, type IsuClient } from '../isu/client.js';
 import type { IsuEvent } from '../isu/types.js';
+import type { PushDevices } from '../push/devices.js';
 import { StandingsSync } from './standings.js';
 
 // Polling policy. ISU only ever gets one request at a time from us (IsuClient
@@ -23,6 +24,11 @@ const FINISH_CHECK_EVERY = 6 * 60 * 60_000; // a just-finished event, fetched wh
 const PULLED_RECENTLY = 12 * 60 * 60_000; // a finished event still settling isn't fetched again sooner
 const STANDINGS_EVERY = 6 * 60 * 60_000; // ISU's World Tour standings (only changed lists are fetched)
 const LIVE_STANDINGS_EVERY = 60 * 60_000; // ...hourly around an event: ISU recalculates after each day of racing
+// Render's free plan sleeps after 15 minutes without requests, and a sleeping
+// server neither polls ISU nor pushes. Around an event we request our own
+// public URL to stay up; a GitHub Actions cron wakes us every few hours to
+// notice an event coming (.github/workflows/wake.yml).
+const KEEP_AWAKE_EVERY = 10 * 60_000;
 
 type Log = (msg: string) => void;
 
@@ -44,12 +50,14 @@ export class SyncWorker {
   private lastHeats = new Map<number, number>();
   private lastEventList = 0;
   private lastFinishCheck = new Map<number, number>();
+  private lastKeepAwake = 0;
   private stopped = false;
 
   constructor(
     private readonly isu: IsuClient,
     private readonly pool: pg.Pool,
     private readonly log: Log = (m) => console.log(`[sync] ${m}`),
+    private readonly opts: { push?: PushDevices | null; keepAwakeUrl?: string | null } = {},
   ) {
     this.ingest = new Ingest(pool);
     this.standings = new StandingsSync(isu, pool, log);
@@ -203,6 +211,18 @@ export class SyncWorker {
       }
     }
     this.isu.recording = false;
+
+    if (live.length && this.opts.push?.enabled) {
+      const sent = await this.opts.push.sendDue(new Date(now)).catch((err) => {
+        this.log(`push failed: ${(err as Error).message}`);
+        return 0;
+      });
+      if (sent) this.log(`pushed ${sent} alert${sent === 1 ? '' : 's'}`);
+    }
+    if (live.length && this.opts.keepAwakeUrl && now - this.lastKeepAwake >= KEEP_AWAKE_EVERY) {
+      this.lastKeepAwake = now;
+      fetch(new URL('/health', this.opts.keepAwakeUrl), { signal: AbortSignal.timeout(10_000) }).catch(() => {});
+    }
 
     // After the live polling, so a standings hiccup never holds up results.
     if (now - this.lastStandings >= (live.length ? LIVE_STANDINGS_EVERY : STANDINGS_EVERY)) {

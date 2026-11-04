@@ -15,6 +15,8 @@ import { createPool } from '../src/db/pool.js';
 import { Ingest } from '../src/db/ingest.js';
 import { IsuClient } from '../src/isu/client.js';
 import { IsuRecorder } from '../src/isu/recorder.js';
+import type { PushMessage, PushSender, SendResult } from '../src/push/apns.js';
+import { PushDevices } from '../src/push/devices.js';
 import { StandingsSync } from '../src/sync/standings.js';
 import { OLYMPICS, WORLDS, WT1_2025, WT1_2026, round, standings2025, standings2026, tree } from './fixtures.js';
 
@@ -443,6 +445,45 @@ describe.skipIf(!url)('database + API', () => {
         await client.query('rollback');
         client.release();
       }
+    });
+  });
+
+  describe('push', () => {
+    const token = 'ab'.repeat(32);
+    const sends: { token: string; message: PushMessage }[] = [];
+    let reply: SendResult = 'ok';
+    const sender: PushSender = { send: async (t, _env, message) => { sends.push({ token: t, message }); return reply; } };
+    // An hour earlier the next heat wasn't due yet; Jens's 500 m heat was already official.
+    const before = new Date(NOW.getTime() - 3600_000);
+
+    it('registers a phone, and says when the server can\'t push', async () => {
+      await request(app).put('/devices/nope').send({}).expect(400);
+      expect((await request(app).put(`/devices/${token}`).send({ environment: 'sandbox', favorites: [] }).expect(200)).body).toEqual({ push: false });
+      const push = new PushDevices(pool, sender);
+      const api = createApp(pool, { now: () => before, push });
+      await request(api).put(`/devices/${token}`).send({ environment: 'staging', favorites: [] }).expect(400);
+      const next = await one<{ skater_id: number }>(
+        `select en.skater_id from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+         join event e on e.id = c.event_id join entry en on en.heat_id = h.id
+         where e.slug = $1 and h.state in ('scheduled', 'start_list') and en.skater_id is not null
+         order by h.starts_at, h.run_order nulls last, h.id, en.id limit 1`, [WT1_2026]);
+      const jens = await one<{ id: number }>(`select id from skater where last_name = 'Van ''t Wout' and first_name = 'Jens'`);
+      const favorites = [next.skater_id, jens.id].map((id) => ({ id, addedAt: '2026-01-01T00:00:00Z' }));
+      expect((await request(api).put(`/devices/${token}`)
+        .send({ environment: 'sandbox', favorites, notifyPicks: false }).expect(200)).body).toEqual({ push: true });
+
+      // Registering didn't replay the result already in; the heat coming up goes out once.
+      expect(await push.sendDue(NOW)).toBe(1);
+      expect(sends).toHaveLength(1);
+      expect(sends[0]!.message.payload).toMatchObject({ aps: { alert: { title: expect.stringMatching(/ is up next$/) }, 'thread-id': WT1_2026 } });
+      expect(sends[0]!.message.collapseId).toMatch(/^start-\d+$/);
+      expect(await push.sendDue(NOW)).toBe(0);
+
+      // Apple says the token is gone: the device is forgotten.
+      await pool.query('delete from push_sent where token = $1', [token]);
+      reply = 'gone';
+      expect(await push.sendDue(NOW)).toBe(0);
+      expect((await one<{ n: number }>('select count(*)::int as n from push_device')).n).toBe(0);
     });
   });
 

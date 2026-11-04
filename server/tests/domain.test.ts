@@ -5,6 +5,7 @@ import { cleanCity, distanceLabel, eventNames, medal, raceCodes, roundLabel, sho
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/picks.js';
+import { picksAlerts, raceAlerts, type PushRace } from '../src/domain/push.js';
 import { parseRule } from '../src/domain/rules.js';
 import { WORLD_TOUR_POINTS, classifyStanding, genderOfSkaters, standingEventCity, standingPoints, titleCaseName } from '../src/domain/standings.js';
 import { summarize } from '../src/domain/summary.js';
@@ -447,3 +448,42 @@ describe('heatTimes', () => {
   });
 });
 
+
+describe('push alerts', () => {
+  const now = new Date('2026-10-31T20:00:00Z');
+  const race = (over: Partial<PushRace>): PushRace & { event: string } => ({
+    heatId: 1, startsAt: '2026-10-31T20:05:00Z', state: 'start_list', upNext: true, skaters: [7], event: 'montreal',
+    start: { title: 'Kim Gilli is up next', body: 'Women 1500 m Final' }, result: null, ...over,
+  });
+  const added = new Map([[7, new Date('2026-10-01T00:00:00Z')]]);
+  const all = { starts: true, results: true, picks: true };
+
+  it('sends up next once, and results within six hours', () => {
+    const alerts = raceAlerts([race({}), race({ heatId: 2, state: 'official', upNext: false, startsAt: '2026-10-31T19:00:00Z',
+      result: { title: 'Kim Gilli won the 1500 m Final', body: '2:21.004' } })], added, all, new Set(), now, (r) => r.event);
+    expect(alerts.map((a) => [a.id, a.link, a.thread])).toEqual([['start-1', 'heat', 'montreal'], ['result-2', 'heat', 'montreal']]);
+    expect(raceAlerts([race({})], added, all, new Set(['start-1']), now, (r) => r.event)).toEqual([]);
+    const old = race({ state: 'official', upNext: false, startsAt: '2026-10-31T13:00:00Z', result: { title: 'x', body: 'y' } });
+    expect(raceAlerts([old], added, all, new Set(), now, (r) => r.event)).toEqual([]);
+  });
+
+  it('skips races before the skater was a favorite, and switched-off kinds', () => {
+    expect(raceAlerts([race({})], new Map([[7, new Date('2026-10-31T20:10:00Z')]]), all, new Set(), now, (r) => r.event)).toEqual([]);
+    expect(raceAlerts([race({})], added, { ...all, starts: false }, new Set(), now, (r) => r.event)).toEqual([]);
+    expect(raceAlerts([race({ upNext: false })], added, all, new Set(), now, (r) => r.event)).toEqual([]);
+  });
+
+  it('announces picks once per round', () => {
+    const open = [
+      { heatId: 10, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 1', picked: false },
+      { heatId: 11, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 2', picked: false },
+      { heatId: 12, title: 'Men 500 m', round: 'Finals', race: 'Final A', picked: true },
+    ];
+    const alerts = picksAlerts(open, { name: 'World Tour #2', city: 'Montréal' }, new Set());
+    expect(alerts).toEqual([{
+      id: 'picks-10', title: 'Picks are open: Women 1000 m semifinals', body: '2 races · Montréal. Lock in your order before the start.',
+      heatId: 10, link: 'pick', thread: 'picks', covers: ['picks-11'],
+    }]);
+    expect(picksAlerts(open, null, new Set(['picks-10', 'picks-11']))).toEqual([]);
+  });
+});

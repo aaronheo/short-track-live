@@ -6,7 +6,7 @@ import UserNotifications
 /// next" alerts to schedule for a few minutes before a heat's planned start,
 /// and which alerts are done with. Pure, so it can be tested.
 ///
-/// Without push from the server (that needs a paid Apple developer account)
+/// When the server pushes (PushRegistration) it sends these itself. Otherwise
 /// the phone does it all: it schedules "up next" ahead from planned times, and
 /// posts results whenever it gets to check (open, or a background refresh).
 struct AlertPlan: Equatable {
@@ -128,6 +128,13 @@ final class RaceAlerts {
     @discardableResult
     func check(_ favorites: Favorites = .shared) async -> Bool {
         let allowed = ([.authorized, .provisional, .ephemeral] as Set<UNAuthorizationStatus>).contains(await status())
+        // The server pushes: nothing for the phone to do but keep it up to date.
+        if await PushRegistration.shared.update(favorites, allowed: allowed) {
+            await removePendingStarts(keeping: [])
+            racesBusy = false
+            picksBusy = false
+            return false
+        }
         racesBusy = await checkRaces(favorites, allowed: allowed)
         picksBusy = await checkPicks(favorites, allowed: allowed)
         return busy

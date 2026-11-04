@@ -1,0 +1,15 @@
+# Wakes the Render service every 6 hours. Render's free plan sleeps after 15
+# idle minutes; once awake, the server stays up by itself while an event is on
+# or a day away (KEEP_AWAKE_EVERY in server/src/sync/worker.ts), so polling and
+# push alerts don't wait for someone to open the app.
+name: Wake server
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: curl -fsS --retry 3 --retry-delay 20 --max-time 120 https://short-track-live.onrender.com/health
