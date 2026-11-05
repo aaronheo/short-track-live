@@ -10,7 +10,7 @@ const pool = createPool();
 // Ask needs an OpenAI key; without one, POST /chat answers 503.
 const askFrom = (db: typeof pool) => (process.env.OPENAI_API_KEY
   ? new Chat(new OpenAI(), db, {
-    model: process.env.OPENAI_MODEL ?? 'gpt-5.5',
+    model: process.env.OPENAI_MODEL ?? 'gpt-5-mini',
     reasoningEffort: (process.env.OPENAI_REASONING_EFFORT ?? 'low') as 'low',
   })
   : null);

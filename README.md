@@ -41,7 +41,7 @@ Questions typed into Search ("How did Sarault do at the Olympics?") go to `POST 
 | Variable | |
 | --- | --- |
 | `OPENAI_API_KEY` | Turns Ask on. Without it `/chat` answers 503 |
-| `OPENAI_MODEL` | Default `gpt-5.5` |
+| `OPENAI_MODEL` | Default `gpt-5-mini` (cheap; `gpt-5.4-mini` is the step up) |
 | `OPENAI_REASONING_EFFORT` | Default `low` |
 
 `/chat` allows 60 questions an hour. To try a question without the app: `npx tsx src/chat/try.ts "Who won the men's 1500 m in Vancouver?"`.
