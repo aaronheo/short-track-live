@@ -5,7 +5,7 @@ import { RateLimit } from '../chat/chat.js';
 import type { Db } from '../db/pool.js';
 import { replayRound } from '../dev/replay.js';
 import { cleanNickname } from '../domain/picks.js';
-import { Accounts, cleanSettings, parseFavorites, type VerifyGoogle } from './accounts.js';
+import { Accounts, cleanSettings, parseFavorites, type VerifyApple, type VerifyGoogle } from './accounts.js';
 import { Athletes, type RaceFilters } from './athletes.js';
 import { Favorites } from './favorites.js';
 import { Picks } from './picks.js';
@@ -29,6 +29,8 @@ export interface AppOptions {
   chatPerHour?: number;
   /** Sign in with Google; unset when there's no GOOGLE_CLIENT_ID. */
   google?: VerifyGoogle | null;
+  /** Sign in with Apple; unset in tests that don't use it. */
+  apple?: VerifyApple | null;
   /** Server push; unset or disabled when there's no APNs key. */
   push?: PushDevices | null;
 }
@@ -199,6 +201,18 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     res.json({ session: token, ...(await accounts.state(accountId)) });
   }));
 
+  // POST /auth/apple { idToken, name }: name only comes on the first sign-in.
+  app.post('/auth/apple', express.json({ limit: '16kb' }), wrap(async (req, res) => {
+    if (!opts.apple) return res.status(503).json({ error: 'Apple sign-in isn’t set up on this server.' });
+    const idToken = text(req.body?.idToken);
+    if (!idToken) return res.status(400).json({ error: 'Send Apple’s identity token as idToken.' });
+    const who = await opts.apple(idToken).catch(() => null);
+    if (!who) return res.status(401).json({ error: 'Apple didn’t confirm that sign-in.' });
+    const name = text(req.body?.name);
+    const { token, accountId } = await accounts.signInApple({ ...who, name: name ? name.slice(0, 100) : null });
+    res.json({ session: token, ...(await accounts.state(accountId)) });
+  }));
+
   app.post('/auth/signout', wrap(async (req, res) => {
     const token = sessionOf(req);
     if (token) await accounts.signOut(token);
@@ -257,7 +271,7 @@ export function createApp(db: Db, opts: AppOptions = {}) {
   }));
 
   // Push. PUT /devices/:token { environment, favorites: [{ id, addedAt }],
-  // notifyStarts, notifyResults, notifyPicks }, with X-Session when signed in
+  // notifyStarts, notifyResults, notifyPicks, notifyActivities, activityToken }, with X-Session when signed in
   // (for picks alerts). { push: false } means the server can't send, so the
   // phone keeps doing its alerts itself.
   app.put('/devices/:token', express.json({ limit: '64kb' }), wrap(async (req, res) => {
@@ -272,10 +286,22 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     const session = sessionOf(req);
     const accountId = session ? await accounts.fromToken(session) : null;
     const flag = (v: unknown) => v !== false;
+    const activityToken = typeof req.body?.activityToken === 'string' && validToken(req.body.activityToken) ? req.body.activityToken as string : null;
     await opts.push.register({
-      token, environment, favorites, accountId,
+      token, environment, favorites, accountId, activityToken,
       starts: flag(req.body?.notifyStarts), results: flag(req.body?.notifyResults), picks: flag(req.body?.notifyPicks),
+      activities: flag(req.body?.notifyActivities),
     }, now());
+    res.json({ push: true });
+  }));
+  // PUT /activities/:token { device, heatId }: a running Live Activity's push token, so the server can update it.
+  app.put('/activities/:token', express.json({ limit: '4kb' }), wrap(async (req, res) => {
+    const token = String(req.params.token);
+    const device = String(req.body?.device ?? '');
+    const heatId = Number(req.body?.heatId);
+    if (!validToken(token) || !validToken(device) || !Number.isInteger(heatId)) return res.status(400).json({ error: 'Send device and heatId.' });
+    if (!opts.push?.enabled) return res.json({ push: false });
+    if (!(await opts.push.registerActivity(token, device, heatId))) return res.status(404).json({ error: 'Unknown device or heat.' });
     res.json({ push: true });
   }));
   app.delete('/devices/:token', wrap(async (req, res) => {

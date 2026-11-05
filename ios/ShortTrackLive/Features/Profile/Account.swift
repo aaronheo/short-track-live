@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Security
 
@@ -14,6 +15,7 @@ struct AccountSettings: Codable, Equatable, Sendable {
     var notifyStarts: Bool?
     var notifyResults: Bool?
     var notifyPicks: Bool?
+    var notifyActivities: Bool?
     var appearance: String?
     var venueTime: Bool?
 }
@@ -51,7 +53,7 @@ struct SavedState: Codable, Equatable, Sendable {
     }
 }
 
-/// Signing in with Google and keeping favorites and settings in the account.
+/// Signing in with Apple or Google and keeping favorites and settings in the account.
 /// Signed out, everything stays on the phone as before. Signed in, the phone
 /// sends its whole state after each change and loads the account's when the
 /// app opens; the last change wins.
@@ -92,21 +94,44 @@ final class AccountStore {
         defer { signingIn = false }
         do {
             let idToken = try await GoogleSignIn().idToken()
-            guard let reply = try await api.send("POST", "/auth/google", body: ["idToken": idToken], as: AccountState.self),
-                  let session = reply.session else { throw APIError.status(0) }
-            Keychain.session = session
-            // Everything on this iPhone stays; the account's other favorites
-            // join it. This iPhone's settings win.
-            let added = Self.combine(local: favorites.skaters, account: reply.favorites)
-            favorites.replace(with: favorites.skaters + added)
-            synced = SavedState(skaters: reply.favorites, settings: reply.settings)
-            account = reply.account
-            notice = "Signed in. Favorites and settings are synced."
-            await push()
+            try await finishSignIn(api.send("POST", "/auth/google", body: ["idToken": idToken], as: AccountState.self))
         } catch is CancellationError {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    /// After Apple's sheet: its identity token, and the name Apple shares only the first time.
+    func signInWithApple(_ result: Result<ASAuthorization, any Error>) async {
+        guard case .success(let authorization) = result,
+              let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken, let idToken = String(data: tokenData, encoding: .utf8) else {
+            if case .failure(let error) = result, (error as? ASAuthorizationError)?.code != .canceled {
+                self.error = error.localizedDescription
+            }
+            return
+        }
+        signingIn = true
+        defer { signingIn = false }
+        let name = credential.fullName.map { PersonNameComponentsFormatter().string(from: $0) }.flatMap { $0.isEmpty ? nil : $0 }
+        do {
+            try await finishSignIn(api.send("POST", "/auth/apple", body: ["idToken": idToken, "name": name ?? ""], as: AccountState.self))
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func finishSignIn(_ reply: AccountState?) async throws {
+        guard let reply, let session = reply.session else { throw APIError.status(0) }
+        Keychain.session = session
+        // Everything on this iPhone stays; the account's other favorites
+        // join it. This iPhone's settings win.
+        let added = Self.combine(local: favorites.skaters, account: reply.favorites)
+        favorites.replace(with: favorites.skaters + added)
+        synced = SavedState(skaters: reply.favorites, settings: reply.settings)
+        account = reply.account
+        notice = "Signed in. Favorites and settings are synced."
+        await push()
     }
 
     func signOut() async {
@@ -194,6 +219,7 @@ final class AccountStore {
         if let on = state.settings.notifyStarts { favorites.notifyStarts = on }
         if let on = state.settings.notifyResults { favorites.notifyResults = on }
         if let on = state.settings.notifyPicks { favorites.notifyPicks = on }
+        if let on = state.settings.notifyActivities { favorites.notifyActivities = on }
         if let mode = state.settings.appearance { defaults.set(mode, forKey: "appearance") }
         if let venue = state.settings.venueTime { defaults.set(venue, forKey: RaceTimes.key) }
     }
@@ -202,6 +228,7 @@ final class AccountStore {
     private var current: SavedState {
         SavedState(skaters: favorites.skaters, settings: AccountSettings(
             notifyStarts: favorites.notifyStarts, notifyResults: favorites.notifyResults, notifyPicks: favorites.notifyPicks,
+            notifyActivities: favorites.notifyActivities,
             appearance: defaults.string(forKey: "appearance") ?? "system",
             venueTime: defaults.object(forKey: RaceTimes.key) as? Bool ?? true))
     }

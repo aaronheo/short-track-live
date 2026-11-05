@@ -10,6 +10,9 @@ import { helmetSql } from './helmet.js';
 export interface GoogleIdentity { sub: string; email: string | null; name: string | null }
 /** Checks a Google ID token from the app; throws when it isn't valid for us. */
 export type VerifyGoogle = (idToken: string) => Promise<GoogleIdentity>;
+/** Apple's token has no name; the app sends the one Apple gave it on the first sign-in. */
+export type AppleIdentity = GoogleIdentity;
+export type VerifyApple = (idToken: string) => Promise<AppleIdentity>;
 
 export interface Settings {
   notifyStarts?: boolean;
@@ -19,10 +22,12 @@ export interface Settings {
   appearance?: 'system' | 'light' | 'dark';
   /** Race times in the venue's clock (true) or the iPhone's. */
   venueTime?: boolean;
+  /** A Live Activity for a favorite's race. */
+  notifyActivities?: boolean;
 }
 
 export interface AccountState {
-  account: { name: string | null; email: string | null; provider: 'google'; nickname: string | null };
+  account: { name: string | null; email: string | null; provider: 'google' | 'apple'; nickname: string | null };
   favorites: { id: number; name: string; last: string; nat: string | null; iso2: string | null; gender: 'Men' | 'Women' | null; helmet: number | null; addedAt: string }[];
   settings: Settings;
   updatedAt: string;
@@ -44,6 +49,17 @@ export function googleVerifier(clientIds: string[]): VerifyGoogle {
   };
 }
 
+/** Apple's ID tokens for our app (audience: the bundle id). */
+export function appleVerifier(audiences: string[]): VerifyApple {
+  const keys = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
+  return async (idToken) => {
+    const { payload } = await jwtVerify(idToken, keys, { issuer: 'https://appleid.apple.com', audience: audiences });
+    if (!payload.sub) throw new Error('No subject');
+    const verified = payload.email_verified === true || payload.email_verified === 'true';
+    return { sub: payload.sub, email: verified && typeof payload.email === 'string' ? payload.email : null, name: null };
+  };
+}
+
 /** Only the settings we know, with the right types. */
 export function cleanSettings(raw: unknown): Settings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -52,6 +68,7 @@ export function cleanSettings(raw: unknown): Settings {
   if (typeof r.notifyResults === 'boolean') out.notifyResults = r.notifyResults;
   if (typeof r.notifyPicks === 'boolean') out.notifyPicks = r.notifyPicks;
   if (typeof r.venueTime === 'boolean') out.venueTime = r.venueTime;
+  if (typeof r.notifyActivities === 'boolean') out.notifyActivities = r.notifyActivities;
   if (r.appearance === 'system' || r.appearance === 'light' || r.appearance === 'dark') out.appearance = r.appearance;
   return out;
 }
@@ -77,9 +94,18 @@ export class Accounts {
 
   /** Finds or makes the account for this Google identity; returns a new session token. */
   async signInGoogle(who: GoogleIdentity): Promise<{ token: string; accountId: number }> {
+    return this.signIn('google_sub', who);
+  }
+
+  /** The same for an Apple identity. Apple and Google sign-ins are separate accounts. */
+  async signInApple(who: AppleIdentity): Promise<{ token: string; accountId: number }> {
+    return this.signIn('apple_sub', who);
+  }
+
+  private async signIn(column: 'google_sub' | 'apple_sub', who: GoogleIdentity): Promise<{ token: string; accountId: number }> {
     const { id } = (await this.db.query<{ id: number }>(
-      `insert into account (google_sub, email, name) values ($1, $2, $3)
-       on conflict (google_sub) do update set email = coalesce(excluded.email, account.email), name = coalesce(excluded.name, account.name)
+      `insert into account (${column}, email, name) values ($1, $2, $3)
+       on conflict (${column}) do update set email = coalesce(excluded.email, account.email), name = coalesce(excluded.name, account.name)
        returning id`, [who.sub, who.email, who.name])).rows[0]!;
     const token = randomBytes(32).toString('base64url');
     await this.db.query('insert into account_session (token_hash, account_id) values ($1, $2)', [hash(token), id]);
@@ -103,8 +129,8 @@ export class Accounts {
   }
 
   async state(accountId: number): Promise<AccountState | null> {
-    const account = (await this.db.query<{ name: string | null; email: string | null; nickname: string | null; settings: unknown; updated_at: Date }>(
-      'select name, email, nickname, settings, updated_at from account where id = $1', [accountId])).rows[0];
+    const account = (await this.db.query<{ name: string | null; email: string | null; nickname: string | null; settings: unknown; updated_at: Date; apple: boolean }>(
+      'select name, email, nickname, settings, updated_at, apple_sub is not null as apple from account where id = $1', [accountId])).rows[0];
     if (!account) return null;
     const favorites = (await this.db.query<{
       id: number; first_name: string | null; last_name: string; nation: string | null; iso2: string | null; gender: string | null; added_at: Date; helmet: number | null;
@@ -113,7 +139,7 @@ export class Accounts {
        from account_favorite f join skater s on s.id = f.skater_id left join nation n on n.code = s.nation
        where f.account_id = $1 order by f.added_at, s.id`, [accountId])).rows;
     return {
-      account: { name: account.name, email: account.email, provider: 'google', nickname: account.nickname },
+      account: { name: account.name, email: account.email, provider: account.apple ? 'apple' : 'google', nickname: account.nickname },
       favorites: favorites.map((f) => ({
         id: f.id, name: f.first_name ? `${f.first_name} ${f.last_name}` : f.last_name, last: f.last_name,
         nat: f.nation, iso2: f.iso2, gender: GENDER[f.gender ?? ''] ?? null, helmet: f.helmet, addedAt: f.added_at.toISOString(),

@@ -1,10 +1,11 @@
+import AuthenticationServices
 import SwiftUI
 
-/// Signed out: sign in with Google. Top of Profile (to keep favorites) and of Picks.
+/// Signed out: sign in with Apple or Google. Top of Profile (to keep favorites) and of Picks.
 struct SignInCard: View {
     @Environment(AccountStore.self) private var account
     var title = "Keep your favorites"
-    var message = "Sign in with Google to save your favorite skaters and settings, and get them back on any iPhone or iPad."
+    var message = "Sign in to save your favorite skaters, settings and picks, and get them back on any iPhone or iPad."
     var icon = "checkmark.icloud"
     var footnote: String? = "Without an account, everything stays on this iPhone."
 
@@ -25,7 +26,10 @@ struct SignInCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            GoogleButton()
+            VStack(spacing: 10) {
+                AppleButton()
+                if GoogleSignIn.isSetUp { GoogleButton() }
+            }
             if let footnote {
                 Text(footnote)
                     .font(.footnote)
@@ -36,6 +40,24 @@ struct SignInCard: View {
         .padding(EdgeInsets(top: 20, leading: 16, bottom: 16, trailing: 16))
         .card()
         .clipShape(.rect(cornerRadius: 16))
+    }
+}
+
+/// Apple's own button: black, white in dark mode.
+private struct AppleButton: View {
+    @Environment(AccountStore.self) private var account
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        SignInWithAppleButton(.continue) { request in
+            request.requestedScopes = [.fullName, .email]
+        } onCompletion: { result in
+            Task { await account.signInWithApple(result) }
+        }
+        .signInWithAppleButtonStyle(scheme == .dark ? .white : .black)
+        .frame(height: 50)
+        .clipShape(.capsule)
+        .disabled(account.signingIn)
     }
 }
 
@@ -78,7 +100,7 @@ struct AccountRow: View {
                         .font(.headline)
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
-                    Text(account.syncedAt == nil ? "Google" : "Google · Synced \(syncedText)")
+                    Text(account.syncedAt == nil ? provider : "\(provider) · Synced \(syncedText)")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                 }
@@ -96,6 +118,8 @@ struct AccountRow: View {
         .card()
         .clipShape(.rect(cornerRadius: 16))
     }
+
+    private var provider: String { account.account?.provider == "apple" ? "Apple" : "Google" }
 
     private var syncedText: String {
         guard let date = account.syncedAt else { return "" }
@@ -121,7 +145,7 @@ struct AccountView: View {
                         .font(.title.weight(.bold))
                         .foregroundStyle(Theme.ink)
                         .padding(.top, 6)
-                    Text("Signed in with Google").font(.subheadline).foregroundStyle(Theme.muted)
+                    Text(account.account?.provider == "apple" ? "Signed in with Apple" : "Signed in with Google").font(.subheadline).foregroundStyle(Theme.muted)
                 }
                 .frame(maxWidth: .infinity)
 

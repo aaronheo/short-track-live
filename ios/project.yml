@@ -11,12 +11,18 @@ settings:
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     SWIFT_EMIT_LOC_STRINGS: NO
+    # The app and its widget extension must match.
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
 targets:
   ShortTrackLive:
     type: application
     platform: iOS
     sources:
       - path: ShortTrackLive
+      - path: Shared
+    dependencies:
+      - target: ShortTrackLiveWidgets
     configFiles:
       Debug: Config/App.xcconfig
       Release: Config/App.xcconfig
@@ -25,11 +31,10 @@ targets:
       properties:
         # Xcode switches this to production when exporting for TestFlight.
         aps-environment: development
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aaronheo.shorttracklive
-        MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -58,10 +63,34 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIBackgroundModes: [fetch]
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
         BGTaskSchedulerPermittedIdentifiers: [com.aaronheo.shorttracklive.refresh]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Short Track connects to its results server on your local network during development.
+  # Live Activity for a favorite's race (Lock Screen and Dynamic Island).
+  ShortTrackLiveWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShortTrackLiveWidgets
+      - path: Shared
+      - path: ShortTrackLive/Resources/Assets.xcassets
+    configFiles:
+      Debug: Config/App.xcconfig
+      Release: Config/App.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aaronheo.shorttracklive.widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: ShortTrackLiveWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Short Track
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
   ShortTrackLiveTests:
     type: bundle.unit-test
     platform: iOS

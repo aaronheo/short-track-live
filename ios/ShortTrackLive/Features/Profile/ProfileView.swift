@@ -36,7 +36,7 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     if account.signedIn {
                         AccountRow()
-                    } else if GoogleSignIn.isSetUp {
+                    } else {
                         SignInCard()
                     }
                     favoritesSection
@@ -154,7 +154,7 @@ struct ProfileView: View {
     private var notificationsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             section("Notifications") {
-                NotificationToggles(picks: account.signedIn) { if permission == .notDetermined { Task { await allow() } } }
+                NotificationToggles(picks: account.signedIn, activities: true) { if permission == .notDetermined { Task { await allow() } } }
             }
             Group {
                 switch permission {
@@ -307,6 +307,8 @@ struct NotificationToggles: View {
     @Environment(Favorites.self) private var favorites
     /// Show the picks switch (signed in, in Profile).
     var picks = false
+    /// Show the Live Activities switch (Profile).
+    var activities = false
     /// Called when a switch is turned on.
     var turnedOn: () -> Void = {}
 
@@ -321,7 +323,14 @@ struct NotificationToggles: View {
                 RowDivider(leading: 16)
                 toggle("Picks are open", note: "When a quarterfinal, semifinal or final gets its start list", isOn: $favorites.notifyPicks)
             }
+            if activities {
+                RowDivider(leading: 16)
+                toggle("Live Activities", note: favorites.notifyActivities ? "Follow a favorite’s race on the Lock Screen, lap by lap"
+                           : "Off: just the up-next and result notifications",
+                       isOn: $favorites.notifyActivities)
+            }
         }
+        .onChange(of: favorites.notifyActivities) { _, on in if !on { Task { await LiveActivities.shared.endAll() } } }
         .onChange(of: favorites.notifyStarts) { _, on in if on { turnedOn() } }
         .onChange(of: favorites.notifyResults) { _, on in if on { turnedOn() } }
         .onChange(of: favorites.notifyPicks) { _, on in if on { turnedOn() } }

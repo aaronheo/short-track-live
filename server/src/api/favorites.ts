@@ -18,6 +18,7 @@ export interface FavoriteRace {
   upNext: boolean;
   /** The favorites in it (ids from the request). */
   skaters: number[];
+  relay: boolean;
   start: AlertText;
   /** Once the heat is official. */
   result: AlertText | null;
@@ -123,7 +124,7 @@ export class Favorites {
           heatId: h.heat_id, roundId: h.round_id, event: h.slug,
           startsAt: h.starts_at?.toISOString() ?? null, state: h.state,
           upNext: next.has(h.heat_id) && soon,
-          skaters: [...new Set(heatRows.map((r) => r.skater_id))],
+          skaters: [...new Set(heatRows.map((r) => r.skater_id))], relay: h.is_relay,
           start: upNext(race, people, teams, heatRows.every((r) => r.named)),
           result: h.state === 'official' ? result(race, skaters) : null,
         };

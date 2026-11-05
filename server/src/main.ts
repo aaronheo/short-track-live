@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 import { Chat } from './chat/chat.js';
 import { createPool } from './db/pool.js';
 import { createApp } from './api/app.js';
-import { googleVerifier } from './api/accounts.js';
+import { appleVerifier, googleVerifier } from './api/accounts.js';
 import { Apns, apnsConfigFromEnv } from './push/apns.js';
 import { PushDevices } from './push/devices.js';
 import { startSync } from './sync/run.js';
@@ -26,12 +26,14 @@ console.log(process.env.OPENAI_API_KEY
 // Sign in with Google: the iOS app's OAuth client id(s), comma-separated. Unset: /auth/google answers 503.
 const googleIds = (process.env.GOOGLE_CLIENT_ID ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const google = googleIds.length ? googleVerifier(googleIds) : null;
+// Sign in with Apple: tokens for the app's bundle id (APPLE_CLIENT_ID to override).
+const apple = appleVerifier((process.env.APPLE_CLIENT_ID ?? 'com.aaronheo.shorttracklive').split(',').map((s) => s.trim()));
 const replayHeat = process.env.REPLAY_HEAT ? Number(process.env.REPLAY_HEAT) : null;
 // Server push needs APNS_KEY, APNS_KEY_ID and APNS_TEAM_ID; without them the phone does its own alerts.
 const apnsConfig = apnsConfigFromEnv();
 const apns = apnsConfig ? new Apns(apnsConfig) : null;
 console.log(apns ? 'Push: on' : 'Push: off, APNS_KEY / APNS_KEY_ID / APNS_TEAM_ID are not set');
-createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google, push: new PushDevices(pool, apns) })
+createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google, apple, push: new PushDevices(pool, apns) })
   .listen(port, () => console.log(`API on http://localhost:${port}`));
 startSync({ push: apns }).catch((err) => {
   console.error(err);

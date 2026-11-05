@@ -77,6 +77,10 @@ With server push (APNs) the server sends these the moment they happen. The phone
 
 When the server can't push (no APNs key, or it can't be reached) the phone does it itself, as before: it schedules "up next" for 4 minutes before each heat's planned start, posts it straight away if the server says the heat is next, and posts results whenever it gets to check (every 30 s while it's open and a favorite is racing, and in background refreshes, which iOS runs when it sees fit).
 
+### Live Activities
+
+When a favorite's individual race is up next, the server starts a Live Activity on the phone with a push (the phone registers its push-to-start token with `PUT /devices/:token`, `activityToken`). The activity shows "up next", then the race lap by lap (lap, progress, the top three plus the favorite with gaps to the leader), then the result; it ends when the result is official and stays on the Lock Screen 30 minutes. The phone reports each activity's own token (`PUT /activities/:token { device, heatId }`) and the worker sends an update after each poll when something changed (`live_activity`, `domain/activity.ts`). The widget extension (`ios/ShortTrackLiveWidgets`) and the app share `ios/Shared/RaceActivity.swift`, whose keys match the server's. Profile → Notifications → Live Activities turns it off. To see one without the server, a Debug build launched with `-sampleActivity` starts a sample: `xcrun simctl launch <device> com.aaronheo.shorttracklive -sampleActivity`, then switch apps (iOS hides an app's own activity while it's in front).
+
 Render's free plan sleeps after 15 idle minutes, and a sleeping server neither polls ISU nor pushes. While an event is on or a day away, the worker requests its own public URL (`RENDER_EXTERNAL_URL`) every 10 minutes to stay up, and a GitHub Actions cron (`.github/workflows/wake.yml`) wakes it every 6 hours to notice an event coming.
 
 ### Standings
@@ -93,7 +97,7 @@ Skaters qualify into each round, so a round can only be picked once its start li
 
 API: `GET /picks`, `GET /picks/heats/:id`, `PUT /picks/heats/:id { finish, penalized, advanced }` (entry ids), `PUT /me/nickname`. Stored in `pick` and `account.nickname`.
 
-### Accounts (Sign in with Google)
+### Accounts (Sign in with Apple or Google)
 
 Signing in is optional; without it everything stays on the phone. Signed in, favorites and settings (notification switches, appearance) are saved to an account and come back on another iPhone or iPad. On the first sign-in the phone's favorites and the account's are combined and the phone's settings win; after that the phone sends its whole state after each change (`PUT /me`) and loads the account's when the app opens (`GET /me`), so the last change wins.
 
@@ -104,7 +108,7 @@ Setup, once:
 2. **Clients → Create client → iOS**, bundle id `com.aaronheo.shorttracklive`. Copy the client id (`….apps.googleusercontent.com`; not a secret).
 3. Put it in `GOOGLE_CLIENT_ID` in `ios/Config/App.xcconfig` and in Render's environment. Without it the app shows no sign-in and `/auth/google` answers 503.
 
-Sign in with Apple needs the paid Apple developer account, so it comes later.
+Sign in with Apple uses Apple's own sheet (`SignInWithAppleButton`); the app sends Apple's identity token and, on the first sign-in only, the name Apple shares to `POST /auth/apple`. The server checks the token against Apple's keys with the bundle id as audience (`APPLE_CLIENT_ID` overrides it) and keeps Apple's id in `account.apple_sub`. Apple and Google sign-ins are separate accounts.
 
 Flags are from [flag-icons](https://github.com/lipis/flag-icons) (MIT, see `ios/ShortTrackLive/Resources/FlagIconsLICENSE.txt`).
 

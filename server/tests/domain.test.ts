@@ -5,6 +5,7 @@ import { cleanCity, distanceLabel, eventNames, medal, raceCodes, roundLabel, sho
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/picks.js';
+import { activityRaceTitle, activityState, type ActivityEntry } from '../src/domain/activity.js';
 import { picksAlerts, raceAlerts, type PushRace } from '../src/domain/push.js';
 import { parseRule } from '../src/domain/rules.js';
 import { WORLD_TOUR_POINTS, classifyStanding, genderOfSkaters, standingEventCity, standingPoints, titleCaseName } from '../src/domain/standings.js';
@@ -485,5 +486,42 @@ describe('push alerts', () => {
       heatId: 10, link: 'pick', thread: 'picks', covers: ['picks-11'],
     }]);
     expect(picksAlerts(open, null, new Set(['picks-10', 'picks-11']))).toEqual([]);
+  });
+});
+
+describe('live activity', () => {
+  const race: AlertRace = {
+    competition: 'Women 1500 m', distanceM: 1500, relay: false, round: 'Finals', heat: 'Final A', destination: null, event: 'World Tour #2',
+  };
+  const skater = (id: number, last: string, over: Partial<ActivityEntry>): ActivityEntry => ({
+    skater_id: id, name: `X ${last}`, last, iso2: 'nl', start_position: id, last_position: null, last_gap_ms: null, lap_count: 0,
+    rank: null, time_text: null, status: null, qualification: null, ...over,
+  });
+  const mine = new Set([2]);
+
+  it('titles the race', () => {
+    expect(activityRaceTitle(race)).toBe('Women 1500 m · Final A');
+  });
+
+  it('is up next, then racing with the top three and the favorite, then the result', () => {
+    const field = [1, 2, 3, 4, 5].map((id) => skater(id, `S${id}`, {}));
+    expect(activityState(race, 'start_list', field, mine, 14)).toMatchObject({ phase: 'upNext', headline: 'S2 is up next', detail: 'start 2 of 5', laps: '13½' });
+
+    const racing = field.map((e, i) => ({ ...e, lap_count: 9, last_position: [2, 5, 1, 3, 4][i]!, last_gap_ms: [140, 900, 0, 410, 600][i]! }));
+    const live = activityState(race, 'running', racing, mine, 14)!;
+    expect(live).toMatchObject({ phase: 'racing', lap: 9, headline: 'S2 5th' });
+    expect(live.progress).toBeCloseTo(9 / 14);
+    expect(live.rows.map((r) => [r.pos, r.name, r.gap, r.mine])).toEqual([
+      [1, 'S3', 'Leader', false], [2, 'S1', '+0.14', false], [3, 'S4', '+0.41', false], [5, 'S2', '+0.90', true],
+    ]);
+
+    const done = field.map((e, i) => ({ ...e, rank: [3, 1, 2, 4, 5][i]!, time_text: ['2:21.500', '2:21.004', '2:21.300', '2:22.0', '2:23.0'][i]! }));
+    const official = activityState(race, 'official', done, mine, 14)!;
+    expect(official).toMatchObject({ phase: 'official', headline: 'X S2 won the 1500 m Final A', progress: 1 });
+    expect(official.rows.map((r) => r.name)).toEqual(['S2', 'S3', 'S1']);
+  });
+
+  it('is nothing without a favorite in the heat', () => {
+    expect(activityState(race, 'running', [skater(1, 'S1', {})], mine, 14)).toBeNull();
   });
 });

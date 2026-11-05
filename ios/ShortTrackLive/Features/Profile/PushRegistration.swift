@@ -25,7 +25,7 @@ final class PushRegistration {
 
     /// True when it's a new token (first launch, or after a restore).
     func received(_ deviceToken: Data) -> Bool {
-        let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+        let hex = deviceToken.hex
         guard hex != token else { return false }
         token = hex
         return true
@@ -34,7 +34,9 @@ final class PushRegistration {
     /// Sends the phone's state when it changed, or once a day. Returns whether the server pushes.
     @discardableResult
     func update(_ favorites: Favorites, allowed: Bool) async -> Bool {
-        guard allowed else { return false }
+        let activities = LiveActivities.shared
+        // Live Activities don't need notification permission, so register for them alone too.
+        guard allowed || activities.allowed else { return false }
         guard let token else {
             register()
             return false
@@ -42,7 +44,9 @@ final class PushRegistration {
         let body = Body(
             environment: Self.environment,
             favorites: favorites.skaters.map { .init(id: $0.id, addedAt: $0.addedAt) },
-            notifyStarts: favorites.notifyStarts, notifyResults: favorites.notifyResults, notifyPicks: favorites.notifyPicks,
+            notifyStarts: allowed && favorites.notifyStarts, notifyResults: allowed && favorites.notifyResults,
+            notifyPicks: allowed && favorites.notifyPicks,
+            notifyActivities: activities.allowed && favorites.notifyActivities, activityToken: activities.startToken,
             signedIn: Keychain.session != nil)
         let fingerprint = (try? JSONEncoder.api.encode(body)).map { "\(token):\($0.base64EncodedString())" }
         if fingerprint == defaults.string(forKey: Keys.sent),
@@ -80,6 +84,9 @@ final class PushRegistration {
         let notifyStarts: Bool
         let notifyResults: Bool
         let notifyPicks: Bool
+        let notifyActivities: Bool
+        /// Live Activities' push-to-start token, so the server can start one.
+        let activityToken: String?
         /// Not read by the server; signing in or out changes the fingerprint so the account link is re-sent.
         let signedIn: Bool
     }
@@ -100,6 +107,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // No prompt: the token comes regardless, and alerts show only once notifications are allowed.
         application.registerForRemoteNotifications()
+        LiveActivities.shared.watch()
         return true
     }
 

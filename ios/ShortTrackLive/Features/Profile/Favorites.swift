@@ -25,6 +25,8 @@ final class Favorites {
     var notifyResults: Bool { didSet { defaults.set(notifyResults, forKey: Keys.results); onChange?() } }
     /// When races open for picks (signed in only).
     var notifyPicks: Bool { didSet { defaults.set(notifyPicks, forKey: Keys.picks); onChange?() } }
+    /// A Live Activity for a favorite's race (started by the server).
+    var notifyActivities: Bool { didSet { defaults.set(notifyActivities, forKey: Keys.activities); onChange?() } }
     /// The first star asks about notifications, once.
     var askedAboutNotifications: Bool { didSet { defaults.set(askedAboutNotifications, forKey: Keys.asked) } }
 
@@ -38,6 +40,7 @@ final class Favorites {
         notifyStarts = defaults.object(forKey: Keys.starts) as? Bool ?? true
         notifyResults = defaults.object(forKey: Keys.results) as? Bool ?? true
         notifyPicks = defaults.object(forKey: Keys.picks) as? Bool ?? true
+        notifyActivities = defaults.object(forKey: Keys.activities) as? Bool ?? true
         askedAboutNotifications = defaults.bool(forKey: Keys.asked)
     }
 
@@ -84,6 +87,7 @@ final class Favorites {
         static let starts = "notifyRaceStarts"
         static let results = "notifyRaceResults"
         static let picks = "notifyPicksOpen"
+        static let activities = "notifyLiveActivities"
         static let asked = "askedAboutNotifications"
     }
 }

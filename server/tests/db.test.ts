@@ -487,6 +487,59 @@ describe.skipIf(!url)('database + API', () => {
     });
   });
 
+  it('POST /auth/apple signs in, keeping the name Apple gives only the first time', async () => {
+    const api = createApp(pool, { now: () => NOW, apple: async (t) => ({ sub: t, email: null, name: null }) });
+    await request(app).post('/auth/apple').send({ idToken: 'x' }).expect(503);
+    await request(api).post('/auth/apple').send({}).expect(400);
+    const first = (await request(api).post('/auth/apple').send({ idToken: 'apple-1', name: 'Aaron Heo' }).expect(200)).body;
+    expect(first.account).toMatchObject({ name: 'Aaron Heo', provider: 'apple' });
+    const again = (await request(api).post('/auth/apple').send({ idToken: 'apple-1' }).expect(200)).body;
+    expect(again.account.name).toBe('Aaron Heo');
+    expect(again.session).not.toBe(first.session);
+  });
+
+  describe('live activities', () => {
+    it('starts an activity when a favorite is up next, then updates it lap by lap', async () => {
+      const device = 'cd'.repeat(32);
+      const startToken = 'ef'.repeat(32);
+      const activityToken = '12'.repeat(32);
+      const sends: { token: string; message: PushMessage }[] = [];
+      const push = new PushDevices(pool, { send: async (t, _e, message) => { sends.push({ token: t, message }); return 'ok'; } });
+      const api = createApp(pool, { now: () => NOW, push });
+      const next = await one<{ heat_id: number; skater_id: number }>(
+        `select h.id as heat_id, en.skater_id from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+         join event e on e.id = c.event_id join entry en on en.heat_id = h.id
+         where e.slug = $1 and h.state in ('scheduled', 'start_list') and en.skater_id is not null and not c.is_relay
+         order by h.starts_at, h.run_order nulls last, h.id, en.id limit 1`, [WT1_2026]);
+      const running = await one<{ heat_id: number; skater_id: number }>(
+        `select h.id as heat_id, en.skater_id from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id
+         join event e on e.id = c.event_id join entry en on en.heat_id = h.id
+         where e.slug = $1 and h.state = 'running' and en.skater_id is not null order by en.id limit 1`, [WT1_2026]);
+      const favorites = [next.skater_id, running.skater_id].map((id) => ({ id, addedAt: '2026-01-01T00:00:00Z' }));
+      // Registered an hour earlier, so nothing counts as already due.
+      await push.register({ token: device, environment: 'sandbox', favorites, accountId: null, activityToken: startToken,
+        starts: false, results: false, picks: false, activities: true }, new Date(NOW.getTime() - 3600_000));
+
+      await push.sendDue(NOW);
+      const start = sends.find((s) => s.token === startToken)!;
+      expect(start.message).toMatchObject({ pushType: 'liveactivity', topicSuffix: '.push-type.liveactivity' });
+      expect(start.message.payload).toMatchObject({ aps: { event: 'start', 'attributes-type': 'RaceActivityAttributes',
+        attributes: { heatId: next.heat_id }, 'content-state': { phase: 'upNext' } } });
+
+      // The phone reports the running activity's token; the server sends it the race as it stands.
+      await request(api).put(`/activities/${activityToken}`).send({ device, heatId: running.heat_id }).expect(200);
+      await request(api).put(`/activities/${activityToken}`).send({ device: 'nope', heatId: running.heat_id }).expect(400);
+      sends.length = 0;
+      await push.sendDue(NOW);
+      const update = sends.find((s) => s.token === activityToken)!;
+      expect(update.message.payload).toMatchObject({ aps: { event: 'update', 'content-state': { phase: 'racing' } } });
+      // Nothing changed: no second update, and the start isn't repeated.
+      sends.length = 0;
+      await push.sendDue(NOW);
+      expect(sends).toEqual([]);
+    });
+  });
+
   describe('picks', () => {
     const api = () => createApp(pool, {
       now: () => NOW,

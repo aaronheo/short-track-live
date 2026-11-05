@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 import { Chat } from '../chat/chat.js';
 import { createPool } from '../db/pool.js';
 import { createApp } from './app.js';
-import { googleVerifier } from './accounts.js';
+import { appleVerifier, googleVerifier } from './accounts.js';
 
 const port = Number(process.env.PORT ?? 4310);
 const pool = createPool();
@@ -17,8 +17,10 @@ const askFrom = (db: typeof pool) => (process.env.OPENAI_API_KEY
 // Sign in with Google: the iOS app's OAuth client id(s), comma-separated. Unset: /auth/google answers 503.
 const googleIds = (process.env.GOOGLE_CLIENT_ID ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const google = googleIds.length ? googleVerifier(googleIds) : null;
+// Sign in with Apple: tokens for the app's bundle id (APPLE_CLIENT_ID to override).
+const apple = appleVerifier((process.env.APPLE_CLIENT_ID ?? 'com.aaronheo.shorttracklive').split(',').map((s) => s.trim()));
 const replayHeat = process.env.REPLAY_HEAT ? Number(process.env.REPLAY_HEAT) : null;
 
-createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google }).listen(port, () => {
+createApp(pool, { replayHeat, token: process.env.API_TOKEN, chat: askFrom(pool), google, apple }).listen(port, () => {
   console.log(`API on http://localhost:${port}${replayHeat ? ` (replaying heat ${replayHeat})` : ''}`);
 });

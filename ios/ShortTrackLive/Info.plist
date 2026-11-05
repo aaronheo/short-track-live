@@ -48,6 +48,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Short Track connects to its results server on your local network during development.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
