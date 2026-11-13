@@ -119,10 +119,12 @@ describe.skipIf(!url)('replaying the men\'s 500 m finals in Montréal', () => {
   it('goes live when Final A starts, and the events list says so', async () => {
     await at('18:41:00'); // Final B is done
     expect((await round()).heats.map((h) => h.state)).toEqual(['official', 'start_list']);
+    const next = (await request(app).get('/seasons/2026%2F2027/events').expect(200)).body;
+    expect(next.live.onTheIce).toMatchObject({ heat: 'Final A', isLive: false });
     await at('18:46:00');
     expect((await finalA()).state).toBe('running');
     const events = (await request(app).get('/seasons/2026%2F2027/events').expect(200)).body;
-    expect(events.live.onTheIce).toMatchObject({ competition: 'Men 500 m', round: 'Finals', isLive: true });
+    expect(events.live.onTheIce).toMatchObject({ competition: 'Men 500 m', round: 'Finals', heat: 'Final A', isLive: true });
   });
 
   it('posts the result, then makes it official', async () => {

@@ -179,9 +179,12 @@ export function onTheIce(view: RoundResponse): OnTheIce {
   const running = view.heats.find((h) => h.state === 'running');
   const next = running ?? view.heats.find((h) => h.state === 'start_list' || h.state === 'scheduled');
   const index = next ? view.heats.indexOf(next) + 1 : null;
+  // Finals go by name: ISU calls the A final "Final" when there's a Final B too.
+  const final = next && /^final/i.test(next.name)
+    ? (next.name === 'Final' && view.heats.some((h) => /^final b/i.test(h.name)) ? 'Final A' : next.name) : null;
   return {
     roundId: view.round.id, competition: view.round.competition, round: view.round.name,
-    heat: index ? `Heat ${index} of ${view.heats.length}` : null,
+    heat: final ?? (index ? `Heat ${index} of ${view.heats.length}` : null),
     lap: running?.lap ? `Lap ${running.lap.current} of ${lapTotalLabel(running.lap.total)}` : null,
     isLive: running != null,
   };
