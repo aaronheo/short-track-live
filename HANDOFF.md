@@ -76,6 +76,7 @@ One-off scripts against production go in your scratch space and run with `npx ts
 - `push/`: APNs (`apns.ts`, HTTP/2 + ES256 token) and `devices.ts` (registrations, `sendDue()` after each live poll: alerts, and starting, updating and ending Live Activities).
 - `chat/`: Ask (OpenAI, tools + read-only SQL; schema description in `tools.ts`).
 - `dev/replay.ts`: `REPLAY_HEAT=<id>` fakes one finished heat as live at the API layer.
+- `dev/live-replay.ts`, `dev/export-recording.ts`, `dev/slice-recording.ts`: replaying a recorded weekend (see `server/TESTING.md`).
 
 **iOS (`ios/ShortTrackLive`)**
 - `App/`: `ShortTrackLiveApp.swift` (tabs; split vs stack layout; tab-bar-on-scroll; `screen(title:)`), `AppModel.swift` (navigation state, deep links, `tabBarAtSide`/`tabBarFixed`).
@@ -135,8 +136,8 @@ Done Oct 30 in another session (commits 7cf3244 → 453ef36):
 Aaron's goal is to test the live features thoroughly before calling this production quality. The agreed plan, step 1 done:
 
 1. ✅ **Record real live weekends.** `isu_recording(fetched_at, key, method, path, body, hash, data gzip)`. One row per changed response during live polling. Montréal (World Tour #2, 2026) is the recording to build on; recording is now off (`ISU_RECORD=1` turns it on). Read rows with `gunzipSync(row.data)`.
-2. **Fake ISU server.** An `IsuClient` stand-in (or `fetchImpl`) that serves a recording on a virtual clock: real time, 10×/60×, pause, jump to a time. Until a recording exists, synthesize a timeline from a finished event (start list → running with laps appearing by `elapsed_ms` → unofficial → official). Then the real worker → ingest → DB → API → app all run. `dev/replay.ts` is a much smaller version of this idea, at the API layer only.
-3. **Scenario tests in vitest** on top of it: play a timeline, assert at checkpoints. Picks open when a QF goes official; a penalty after unofficial changes who advances; picks lock two races ahead (and 3 minutes before the first race after a break) and score when official; a re-run heat; the schedule slipping; ISU erroring mid-round; results corrected after official.
+2. ✅ **Fake ISU server.** `isu/fake.ts`: `FakeIsu` (an `IsuClient` `fetchImpl` answering from a recording) and `VirtualClock`. `npm run replay:live` runs the real worker and API on it against a local database (port 4310, clock control on 4311). The Montréal recording is exported to `server/recordings/` (gitignored, `npm run recording:export`). How to use it: `server/TESTING.md`.
+3. **Scenario tests in vitest** on top of it (started: `tests/replay.test.ts` plays the Montréal men's 500 m finals from a 23 KB slice; `npm run recording:slice` cuts more). Still to cover: Picks open when a QF goes official; a penalty after unofficial changes who advances; picks lock two races ahead (and 3 minutes before the first race after a break) and score when official; a re-run heat; the schedule slipping; ISU erroring mid-round; results corrected after official.
 4. **A test server for the phone.** A second Render service in simulation mode with its own database (never production), and a hidden Debug-only control in Profile for event, speed and jump time.
 
 Propose the design of 2–4 to Aaron before building; 4 involves new infrastructure.

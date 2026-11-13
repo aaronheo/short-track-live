@@ -28,6 +28,7 @@ Apply the files in `supabase/migrations/` to the database once, in order, then:
 | `npm run dev` | API on port 4310 plus the sync worker (polls ISU only while an event is live) |
 | `npm run api` | API only |
 | `REPLAY_HEAT=<heat id> npm run api` | Replays a finished heat lap by lap as if it were live, for testing the live screens |
+| `npm run replay:live -- --from day2` | Plays the recorded Montréal weekend back as if it were live, on a local database, for testing the live features with the app ([server/TESTING.md](server/TESTING.md)) |
 | `npm test` | Unit tests; set `TEST_DATABASE_URL` to a throwaway database to also run the database and API tests (they drop its schema) |
 
 The server sends ISU at most one request per second and keeps every raw response in `server/.cache/`.

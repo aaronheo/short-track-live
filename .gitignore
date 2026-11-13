@@ -15,3 +15,6 @@ xcuserdata/
 
 # Server URL and token for the deployed server
 ios/Config/Secrets.xcconfig
+
+# ISU recordings exported for the fake ISU (large; see server/TESTING.md)
+server/recordings/

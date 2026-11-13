@@ -13,7 +13,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --no-file-parallelism",
     "start": "tsx src/main.ts",
-    "backfill:history": "tsx src/sync/run.ts --all-history"
+    "backfill:history": "tsx src/sync/run.ts --all-history",
+    "replay:live": "tsx src/dev/live-replay.ts",
+    "recording:export": "tsx src/dev/export-recording.ts",
+    "recording:slice": "tsx src/dev/slice-recording.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
