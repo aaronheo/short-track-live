@@ -21,7 +21,7 @@ const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) ? v : 
 
 const SCHEMA = `Tables (Postgres):
 - season(id, title)  -- title like '2025/2026'
-- event(id, slug, name, short_name, series, city, country_code, starts_on date, ends_on date, season_id, state)  -- junior events have 'Junior' in name; short_name is how to call an event (World Cup #3, World Tour #1, European Championships)
+- event(id, slug, name, short_name, series, city, country_code, starts_on date, ends_on date, season_id, state)  -- short_name is how to call an event (World Cup #3, World Tour #1, European Championships)
 - competition(id, event_id, name, gender ['Men','Women','Mixed'], distance_m, is_relay)  -- e.g. 'Men 500 m', "Women's 1000m" (Olympics)
 - round(id, competition_id, name, starts_at)  -- 'Heats', 'Quarterfinals', 'Semifinals', 'Finals', 'Rep. Heats', ...
 - heat(id, round_id, name, starts_at, state)  -- name 'Heat 3', 'Final A', 'Final B', 'Final' (single final), 'Semifinal 2' (Olympics)
@@ -68,7 +68,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function' as const,
     function: {
       name: 'list_events',
-      description: 'Events (World Tour, Championships, Olympics, junior events) with slug, city and dates.',
+      description: 'Events (World Tour, Championships, Olympics) with slug, city and dates.',
       parameters: {
         type: 'object', additionalProperties: false,
         properties: { season: { type: 'string', description: "e.g. '2025/2026'; omit for all seasons" } },

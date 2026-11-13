@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import { Ingest, SETTLE_DAYS, eventState } from '../db/ingest.js';
 import { competitionName, roundName } from '../domain/normalize.js';
+import { isJunior } from '../domain/format.js';
 import { isuLocalDate } from '../domain/time.js';
 import { isRelay, type IsuClient } from '../isu/client.js';
 import type { IsuEvent } from '../isu/types.js';
@@ -17,9 +18,6 @@ const LIVE_EVENT_LIST_EVERY = 30 * 60_000; // ...more often while an event is li
 const HOT_WINDOW = 15 * 60_000;
 // ISU's results before this season are fragments: one race per round, a few skaters in each.
 const HISTORY_FROM = '2019/2020';
-// ISU event ids the backfill leaves out. ISU lists the 2022 Junior Worlds twice;
-// this copy lacks the women's 500 m and 1000 m finals (the other, 4103, is whole).
-const SKIP_EVENTS = new Set([4096]);
 const FINISH_CHECK_EVERY = 6 * 60 * 60_000; // a just-finished event, fetched whole and fresh
 const PULLED_RECENTLY = 12 * 60 * 60_000; // a finished event still settling isn't fetched again sooner
 const STANDINGS_EVERY = 6 * 60 * 60_000; // ISU's World Tour standings (only changed lists are fetched)
@@ -77,10 +75,9 @@ export class SyncWorker {
    */
   async backfill(seasonTitles: string[], opts: { maxDbBytes?: number } = {}): Promise<void> {
     for (const title of seasonTitles) {
-      const events = await this.isu.events(title);
+      const events = await this.seniorEvents(title);
       this.log(`${title}: ${events.length} events`);
       for (const ev of events) {
-        if (SKIP_EVENTS.has(Number(ev.event_id ?? ev.id))) continue;
         if (opts.maxDbBytes && await this.dbBytes() > opts.maxDbBytes) {
           this.log(`database is over ${Math.round(opts.maxDbBytes / 1e6)} MB; stopping the backfill here`);
           return;
@@ -182,7 +179,7 @@ export class SyncWorker {
       this.lastEventList = now;
       const { current } = await this.seasons();
       this.isu.recording = live.length > 0;
-      const events = await this.isu.events(current);
+      const events = await this.seniorEvents(current);
       this.isu.recording = false;
       for (const ev of events) await this.ingest.upsertEvent(ev);
       this.log(`refreshed ${current} event list`);
@@ -301,9 +298,14 @@ export class SyncWorker {
     }
   }
 
+  /** ISU's events for a season, without junior ones: the app covers senior events only. */
+  private async seniorEvents(seasonTitle: string): Promise<IsuEvent[]> {
+    return (await this.isu.events(seasonTitle)).filter((ev) => !isJunior(ev));
+  }
+
   /** A full, fresh pull of an event that has just ended (then daily until it settles). */
   private async finishEvent(ev: { id: number; slug: string }): Promise<void> {
-    const events = await this.isu.events((await this.seasons()).current);
+    const events = await this.seniorEvents((await this.seasons()).current);
     const isuEvent = events.find((e) => e.slug === ev.slug);
     if (isuEvent && eventState(isuEvent.state) === 'finished') await this.pullWholeEvent({ ...isuEvent });
   }

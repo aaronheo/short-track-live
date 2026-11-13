@@ -42,14 +42,13 @@ export function gap(ms: number | null | undefined): string | null {
  * "Olympic Winter Games 2026 Short Track Speed Skating" → "Olympic Winter Games 2026".
  */
 /** Event kinds that count their stops in a season ("World Cup #3"). */
-const SERIES = ['Junior World Cup', 'World Tour', 'World Cup'] as const;
+const SERIES = ['World Tour', 'World Cup'] as const;
 
 /** Championships named by ISU's series, whatever the event's own (sponsored, dated) name says. */
 const CHAMPIONSHIPS: Record<string, string> = {
   'World Championships': 'World Championships',
   'European Championships': 'European Championships',
   'Four Continents Championships': 'Four Continents Championships',
-  'World Junior Championships': 'Junior World Championships',
 };
 
 /**
@@ -69,6 +68,11 @@ export function eventNames(events: { name: string; series: string | null }[]): s
     }
     return CHAMPIONSHIPS[series ?? ''] ?? shortEventName(name);
   });
+}
+
+/** A junior event (Junior World Cup, World Junior Championships). The app only covers senior events. */
+export function isJunior(ev: { name?: string | null; event_sub_type_name?: string | null }): boolean {
+  return /junior/i.test(`${ev.name ?? ''} ${ev.event_sub_type_name ?? ''}`);
 }
 
 /** ISU's city, without the arena ("Salt Lake City, Utah Olympic Oval") and with a few fixes. */

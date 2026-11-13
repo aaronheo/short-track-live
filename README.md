@@ -1,6 +1,6 @@
 # Short Track Live
 
-Live results for ISU short track events: the schedule in running order, each race's heats as they finish, who's qualified, and lap-by-lap data. For personal testing only until ISU agrees to how its data is used (see below).
+Live results for senior ISU short track events (World Tour, championships, Olympics; junior events are left out): the schedule in running order, each race's heats as they finish, who's qualified, and lap-by-lap data. For personal testing only until ISU agrees to how its data is used (see below).
 
 ```
 server/    Node + Express + TypeScript: polls ISU, stores results in Postgres, serves the app API
