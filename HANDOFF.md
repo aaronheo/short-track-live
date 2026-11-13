@@ -68,7 +68,7 @@ One-off scripts against production go in your scratch space and run with `npx ts
 
 **Server (`server/src`)**
 - `isu/client.ts`: ISU client. One request at a time, ≤1/s, retries, raw responses cached on disk. `recording` flag + `recorder` hook.
-- `isu/recorder.ts`: saves changed ISU responses during live events into `isu_recording`.
+- `isu/recorder.ts`: saves changed ISU responses during live events into `isu_recording`. Only with `ISU_RECORD=1` (off since 2026-11-13).
 - `db/ingest.ts`: ISU JSON → our tables (events, competitions, rounds, heats, entries, laps, schedule). Heat times, event short names, and city cleanup happen here. ISU sometimes returns an unfinished heat with most of its skaters missing; if a response has fewer than half the entries we stored, the roster is kept until an official result replaces it.
 - `sync/worker.ts`: polling policy: backfill once, daily event list, live event polling (racing heats every 10 s and always first in ISU's one-request queue; structure every 60 s and far-off start lists every 10 min, both skipped while a heat is running), settling re-pulls for a week, standings. `prioritizeRounds()` is tested in `tests/sync.test.ts`. `sync/standings.ts`: World Tour / World Cup standings, all seasons since 2019/20.
 - `api/app.ts`: routes. `api/views.ts` + `api/repo.ts`: events, schedule, rounds, heats. Other files: `athletes.ts`, `favorites.ts`, `accounts.ts` (Google sign-in, settings sync), `picks.ts`, `standings.ts`, `helmet.ts` (this season's helmet number).
@@ -121,8 +121,7 @@ Done Oct 30 in another session (commits 7cf3244 → 453ef36):
 
 ## In flight right now
 
-- **Montréal (World Tour #2) is racing Oct 30 – Nov 1.** The production worker polls it, and **every changed ISU response is being recorded** in `isu_recording`. Don't break the worker this weekend; if you must deploy, keep it small and check Render logs afterwards.
-- **Recording is bigger than expected:** about 22,500 rows and 22 MB (gzipped) after two days of Montréal; the database is at 130 MB of Supabase's 500 MB free tier. Recording every event all season would fill it. Before the next event, decide with Aaron: export each finished event's recording to a file (and delete the rows, with his OK), record only some events, or slim what's kept.
+- **Recording is off.** It took 30–50 MB per weekend and pushed the database to 260 MB of Supabase's 500 MB free tier. On 2026-11-13 junior events were dropped from the app and deleted, along with their recordings; recording now needs `ISU_RECORD=1`. What's kept is World Tour #2 in Montréal (Oct 29 – Nov 2, 2026): 33,244 rows, 45 MB. The database is at 110 MB.
 - **Uncommitted work in the working tree** (Aaron's, from the Oct 30 session; tests pass, not deployed):
   - **ADV picks**: a skater can be picked as advanced by the referee (ADV button beside PEN). Penalties and advancements both score 5 now (places still 3 / 1). `PUT /picks/heats/:id` takes `advanced`; scoring counts an `ADV…` qualification code. Needs migration `0011_pick_advancements.sql` (untracked file; **already applied in production**). The app decodes picks without `advanced` as empty, so it works against the deployed server too.
   - **Leaderboard** moved off the Picks home: the score card opens it as its own screen.
@@ -135,7 +134,7 @@ Done Oct 30 in another session (commits 7cf3244 → 453ef36):
 
 Aaron's goal is to test the live features thoroughly before calling this production quality. The agreed plan, step 1 done:
 
-1. ✅ **Record real live weekends.** `isu_recording(fetched_at, key, method, path, body, hash, data gzip)`. One row per changed response during live polling. Montréal is the first full recording. Read rows with `gunzipSync(row.data)`.
+1. ✅ **Record real live weekends.** `isu_recording(fetched_at, key, method, path, body, hash, data gzip)`. One row per changed response during live polling. Montréal (World Tour #2, 2026) is the recording to build on; recording is now off (`ISU_RECORD=1` turns it on). Read rows with `gunzipSync(row.data)`.
 2. **Fake ISU server.** An `IsuClient` stand-in (or `fetchImpl`) that serves a recording on a virtual clock: real time, 10×/60×, pause, jump to a time. Until a recording exists, synthesize a timeline from a finished event (start list → running with laps appearing by `elapsed_ms` → unofficial → official). Then the real worker → ingest → DB → API → app all run. `dev/replay.ts` is a much smaller version of this idea, at the API layer only.
 3. **Scenario tests in vitest** on top of it: play a timeline, assert at checkpoints. Picks open when a QF goes official; a penalty after unofficial changes who advances; picks lock two races ahead (and 3 minutes before the first race after a break) and score when official; a re-run heat; the schedule slipping; ISU erroring mid-round; results corrected after official.
 4. **A test server for the phone.** A second Render service in simulation mode with its own database (never production), and a hidden Debug-only control in Profile for event, speed and jump time.

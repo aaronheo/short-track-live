@@ -32,7 +32,7 @@ Apply the files in `supabase/migrations/` to the database once, in order, then:
 
 The server sends ISU at most one request per second and keeps every raw response in `server/.cache/`.
 
-While an event is live, the sync worker also records what ISU answers, with when, in `isu_recording` (migration 0009): the event list and the live polling, gzipped, and only when a response differs from the last one for the same request. It's for playing a live weekend back later to test the live features. `ISU_RECORD=0` turns it off.
+With `ISU_RECORD=1`, the sync worker also records, while an event is live, what ISU answers, with when, in `isu_recording` (migration 0009): the event list and the live polling, gzipped, and only when a response differs from the last one for the same request. It's for playing a live weekend back later to test the live features. It's off by default: a weekend takes 30–50 MB of the database, and World Tour #2 in Montréal (Oct 30 – Nov 1, 2026) is already recorded.
 
 ### Ask
 

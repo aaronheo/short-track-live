@@ -15,10 +15,11 @@ import { SyncWorker } from './worker.js';
  */
 export async function startSync(opts: { backfillOnly?: boolean; allHistory?: boolean; push?: PushSender | null } = {}) {
   const pool = createPool();
-  // Live events' ISU responses go to isu_recording unless ISU_RECORD=0.
+  // With ISU_RECORD=1, live events' ISU responses go to isu_recording (off by
+  // default: a weekend is 30-50 MB, and Montréal 2026 is already recorded).
   const isu = new IsuClient({
     cacheDir: path.resolve(process.env.ISU_CACHE_DIR ?? '.cache/isu'),
-    recorder: process.env.ISU_RECORD === '0' ? undefined : new IsuRecorder(pool),
+    recorder: process.env.ISU_RECORD === '1' ? new IsuRecorder(pool) : undefined,
   });
   const worker = new SyncWorker(isu, pool, undefined, {
     push: opts.push ? new PushDevices(pool, opts.push) : null,
