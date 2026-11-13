@@ -119,6 +119,11 @@ export function roundLabel(round: string, heat: string): string {
   return `${single} · ${heat}`;
 }
 
+/** A heat's name to show: ISU calls the A final just "Final" when there's a Final B too. */
+export function heatTitle(name: string, roundHeats: string[]): string {
+  return name === 'Final' && roundHeats.some((n) => /^final b\b/i.test(n)) ? 'Final A' : name;
+}
+
 /** 1, 2 or 3 for a podium place in an A final (or a single final); else null. */
 export function medal(heat: string, rank: number | null): number | null {
   return rank != null && rank <= 3 && /^final( a\b|$)/i.test(heat.trim()) ? rank : null;

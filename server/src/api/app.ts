@@ -124,7 +124,7 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     const round = heat ? await repo.round(heat.round_id) : null;
     if (!heat || !round) return res.status(404).json({ error: 'Unknown heat' });
     res.json(heatView(round, heat, await repo.entriesForHeat(heat.id), await repo.lapsForHeat(heat.id),
-      round.is_relay ? await repo.relayMembersForHeat(heat.id) : []));
+      round.is_relay ? await repo.relayMembersForHeat(heat.id) : [], (await repo.heats(round.id)).map((h) => h.name)));
   }));
 
   const athletes = new Athletes(db);

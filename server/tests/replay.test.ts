@@ -87,7 +87,7 @@ describe.skipIf(!url)('replaying the men\'s 500 m finals in Montréal', () => {
     await worker.tick(clock.now());
   };
   const round = async () => (await request(app).get(`/rounds/${roundId}`).expect(200)).body as RoundResponse;
-  const finalA = async () => (await round()).heats.find((h) => h.name === 'Final')!;
+  const finalA = async () => (await round()).heats.find((h) => h.name === 'Final A')!;
 
   beforeAll(async () => {
     pool = createPool(url);
@@ -112,7 +112,7 @@ describe.skipIf(!url)('replaying the men\'s 500 m finals in Montréal', () => {
   it('shows both finals as start lists beforehand', async () => {
     const r = await round();
     expect(r.round).toMatchObject({ competition: 'Men 500 m', name: 'Finals' });
-    expect(r.heats.map((h) => [h.name, h.state])).toEqual([['Final B', 'start_list'], ['Final', 'start_list']]);
+    expect(r.heats.map((h) => [h.name, h.state])).toEqual([['Final B', 'start_list'], ['Final A', 'start_list']]);
     expect((await finalA()).entries.every((e) => e.rank == null)).toBe(true);
   });
 
@@ -135,5 +135,7 @@ describe.skipIf(!url)('replaying the men\'s 500 m finals in Montréal', () => {
     expect(final.state).toBe('official');
     expect(final.entries.filter((e) => e.rank != null)).toHaveLength(4);
     expect((await round()).round.state).toBe('finished');
+    const heat = (await request(app).get(`/heats/${final.id}`).expect(200)).body;
+    expect(heat.heat.name).toBe('Final A');
   });
 });

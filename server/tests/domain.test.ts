@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { list, medalNote, ordinal, result, upNext, type AlertRace } from '../src/domain/alerts.js';
 import { shortCountry, statusCode } from '../src/domain/codes.js';
-import { cleanCity, distanceLabel, eventNames, isJunior, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
+import { cleanCity, distanceLabel, eventNames, heatTitle, isJunior, medal, raceCodes, roundLabel, shortEventName, shownTime } from '../src/domain/format.js';
 import { competitionName, genderName, heatName, heatState, normalizeEntries, roundName, titleName } from '../src/domain/normalize.js';
 import { placesCard } from '../src/domain/places.js';
 import { cleanNickname, cutLine, scorePick, validPick } from '../src/domain/picks.js';
@@ -86,6 +86,13 @@ describe('normalize', () => {
       { name: 'ISU Short Track World Tour #3', series: 'ISU World Tour' },
       { name: 'Olympic Winter Games 2026 Short Track Speed Skating', series: 'Olympic Games' },
     ])).toEqual(['World Tour #3', 'Olympic Winter Games 2026']);
+  });
+
+  it('calls the A final "Final A" when there is a Final B', () => {
+    expect(heatTitle('Final', ['Final', 'Final B'])).toBe('Final A');
+    expect(heatTitle('Final', ['Final'])).toBe('Final');
+    expect(heatTitle('Final B', ['Final', 'Final B'])).toBe('Final B');
+    expect(heatTitle('Heat 1', ['Heat 1', 'Heat 2'])).toBe('Heat 1');
   });
 
   it('tells junior events apart', () => {

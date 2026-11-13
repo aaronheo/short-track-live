@@ -2,7 +2,7 @@
 // Swift models in ios/ShortTrackLive/Models mirror them.
 
 import { QUALIFIED_CODES } from '../domain/codes.js';
-import { gap, raceCodes, raceTime, shortEventName, shownTime } from '../domain/format.js';
+import { gap, heatTitle, raceCodes, raceTime, shortEventName, shownTime } from '../domain/format.js';
 import type { HeatState } from '../domain/normalize.js';
 import { placesCard, type PlacesCard } from '../domain/places.js';
 import type { QualRule } from '../domain/rules.js';
@@ -145,7 +145,7 @@ export function roundView(
     const running = h.state === 'running';
     const winnerMs = list.find((e) => e.rank === 1)?.time_ms ?? null;
     return {
-      id: h.id, name: h.name, state: h.state, runOrder: h.run_order, startsAt: iso(h.starts_at),
+      id: h.id, name: heatTitle(h.name, heats.map((x) => x.name)), state: h.state, runOrder: h.run_order, startsAt: iso(h.starts_at),
       lap: running ? { current: Math.max(0, ...list.map((e) => e.last_lap_no ?? 0)), total: totalLaps } : null,
       qualified: running ? [] : list.filter((e) => e.qualification && QUALIFIED_CODES.has(e.qualification))
         .map((e) => ({ last: e.last, iso2: e.iso2, badge: e.qualification! })),
@@ -179,12 +179,10 @@ export function onTheIce(view: RoundResponse): OnTheIce {
   const running = view.heats.find((h) => h.state === 'running');
   const next = running ?? view.heats.find((h) => h.state === 'start_list' || h.state === 'scheduled');
   const index = next ? view.heats.indexOf(next) + 1 : null;
-  // Finals go by name: ISU calls the A final "Final" when there's a Final B too.
-  const final = next && /^final/i.test(next.name)
-    ? (next.name === 'Final' && view.heats.some((h) => /^final b/i.test(h.name)) ? 'Final A' : next.name) : null;
   return {
     roundId: view.round.id, competition: view.round.competition, round: view.round.name,
-    heat: final ?? (index ? `Heat ${index} of ${view.heats.length}` : null),
+    // Finals go by name ("Final A"); other heats by number.
+    heat: next && /^final/i.test(next.name) ? next.name : index ? `Heat ${index} of ${view.heats.length}` : null,
     lap: running?.lap ? `Lap ${running.lap.current} of ${lapTotalLabel(running.lap.total)}` : null,
     isLive: running != null,
   };
@@ -205,7 +203,9 @@ export function relayMembers(rows: MemberRow[]): RelayMember[] {
   });
 }
 
-export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: LapRow[], members: MemberRow[] = []): HeatResponse {
+export function heatView(
+  r: RoundRow, h: HeatRow, entries: EntryRow[], laps: LapRow[], members: MemberRow[] = [], roundHeats: string[] = [],
+): HeatResponse {
   const list = sortEntries(entries, h.state === 'running' ? 'running' : 'official');
   const winnerMs = list.find((e) => e.rank === 1)?.time_ms ?? null;
   const lapsByEntry = new Map<number, LapRow[]>();
@@ -258,7 +258,7 @@ export function heatView(r: RoundRow, h: HeatRow, entries: EntryRow[], laps: Lap
     .map((e) => `${e.last}${e.nation ? ` (${e.nation})` : ''} ${sanctioned[e.status!]}. ISU removes their laps, so one place on each lap has no line.`);
 
   return {
-    heat: { id: h.id, name: h.name, state: h.state, roundId: r.id, round: r.name, competition: r.competition, event: r.event_name, isRelay: r.is_relay },
+    heat: { id: h.id, name: heatTitle(h.name, roundHeats), state: h.state, roundId: r.id, round: r.name, competition: r.competition, event: r.event_name, isRelay: r.is_relay },
     results: list.map((e) => {
       const view = entryView(e, winnerMs, false, h.state);
       return r.is_relay ? { ...view, members: relayMembers(members.filter((m) => m.entry_id === e.id)) } : view;
