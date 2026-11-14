@@ -12,18 +12,35 @@ struct AskTurn: Identifiable, Equatable {
     var state = State.working
 }
 
-/// A conversation with Ask. Kept only while the screen is open: nothing is
+/// A conversation with Ask. Kept only while the app is open: nothing is
 /// saved on the phone or the server.
 @MainActor @Observable
 final class AskModel {
     private(set) var turns: [AskTurn] = []
+    /// The opening question went out: the screen doesn't ask it again when it
+    /// comes back (another layout, a tab switch).
+    private(set) var started = false
     @ObservationIgnored private var task: Task<Void, Never>?
+
+    /// The conversation for an opening question. One at a time, outside the
+    /// view: folding or unfolding the Duo rebuilds the Ask screen in another
+    /// layout, and the conversation (and an answer coming in) carries over.
+    static func conversation(for question: String) -> AskModel {
+        if let current, current.question == question { return current.model }
+        current?.model.stop()
+        let model = AskModel()
+        current = (question, model)
+        return model
+    }
+
+    private static var current: (question: String, model: AskModel)?
 
     var isWorking: Bool { turns.last?.state == .working }
 
     func ask(_ question: String) {
         let text = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isWorking else { return }
+        started = true
         // Earlier answers give the model the context for follow-ups.
         var messages: [[String: String]] = []
         for turn in turns where !turn.answer.isEmpty {
@@ -43,6 +60,7 @@ final class AskModel {
 
     func newChat() {
         stop()
+        started = false
         withAnimation(.snappy) { turns = [] }
     }
 

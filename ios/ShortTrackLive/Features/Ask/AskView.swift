@@ -4,10 +4,15 @@ import SwiftUI
 /// they needed; names and races in them link to the athlete and heat screens.
 struct AskView: View {
     @Environment(AppModel.self) private var app
-    @State private var ask = AskModel()
+    @State private var ask: AskModel
     @State private var draft = ""
     @FocusState private var composing: Bool
     let question: String
+
+    init(question: String) {
+        self.question = question
+        _ask = State(initialValue: AskModel.conversation(for: question))
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -58,9 +63,11 @@ struct AskView: View {
             }
         }
         .task {
-            if ask.turns.isEmpty { ask.ask(question) }
+            if !ask.started { ask.ask(question) }
         }
-        .onDisappear { ask.stop() }
+        // No stop on disappear: that also fires when a link in the answer is
+        // opened on top, on a tab switch, and when the Duo folds or unfolds.
+        // A new question stops the old conversation (AskModel.conversation).
         .sensoryFeedback(.success, trigger: ask.turns.last?.state == .done)
     }
 

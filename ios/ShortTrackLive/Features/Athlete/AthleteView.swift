@@ -217,12 +217,17 @@ private struct RaceListView: View {
             }
 
             if races.loadedFirstPage && races.races.isEmpty {
-                ContentUnavailableView {
-                    Label("No races", systemImage: "line.3.horizontal.decrease.circle")
-                } description: {
-                    Text("Nothing matches these filters.")
-                } actions: {
-                    Button("Clear filters") { races.filters = .init() }
+                if races.filters == .init() {
+                    ContentUnavailableView("No races yet", systemImage: "list.bullet",
+                                           description: Text("Races show here once ISU has results."))
+                } else {
+                    ContentUnavailableView {
+                        Label("No races", systemImage: "line.3.horizontal.decrease.circle")
+                    } description: {
+                        Text("Nothing matches these filters.")
+                    } actions: {
+                        Button("Clear filters") { races.filters = .init() }
+                    }
                 }
             }
 

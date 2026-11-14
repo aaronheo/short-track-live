@@ -34,7 +34,7 @@ struct EventsView: View {
                 ToolbarItem(placement: .topBarTrailing) { seasonMenu(data) }
             }
         }
-        .task(id: season) { await live.run() }
+        .task(id: ObjectIdentifier(live)) { await live.run() }
     }
 
     private func seasonMenu(_ data: EventsResponse) -> some View {

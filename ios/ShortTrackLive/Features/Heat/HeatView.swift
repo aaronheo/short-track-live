@@ -399,7 +399,7 @@ private struct LapTableView: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(Theme.muted)
                     .frame(width: 26, alignment: .leading)
-                ForEach(table.columns, id: \.self) { column in
+                ForEach(Array(table.columns.enumerated()), id: \.offset) { _, column in
                     VStack(spacing: 4) {
                         FlagView(iso2: column.iso2, size: 12)
                         Text(column.last)

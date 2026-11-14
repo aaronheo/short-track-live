@@ -79,6 +79,23 @@ actor APIClient {
         }
     }
 
+    /// For one screen's own copy (`Live`): the response and its ETag, or nil
+    /// when it still matches `etag`, that screen's last one. Not the shared
+    /// ETags above: a screen that hasn't seen a newer response would get 304
+    /// for it from another screen's ETag and keep its old data.
+    func get<T: Decodable & Sendable>(_ path: String, etag: String?, as type: T.Type = T.self) async throws -> (value: T, etag: String?)? {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        let (data, response) = try await session.data(for: request)
+        let http = response as? HTTPURLResponse
+        switch http?.statusCode ?? 0 {
+        case 304: return nil
+        case 200: return (try JSONDecoder.api.decode(T.self, from: data), http?.value(forHTTPHeaderField: "ETag"))
+        case let code: throw APIError.status(code)
+        }
+    }
+
     /// POST, PUT or DELETE with an optional JSON body. `account`: the signed-in
     /// session token, sent as X-Session. Nil for an empty (204) response.
     func send<T: Decodable & Sendable>(_ method: String, _ path: String, body: (any Encodable & Sendable)? = nil,

@@ -176,8 +176,9 @@ final class AccountStore {
     func sync() async {
         guard let session = Keychain.session, account != nil else { return }
         if current != synced { return await push() }
+        let sent = current
         do {
-            if let state = try await api.send("GET", "/me", account: session, as: AccountState.self) { apply(state) }
+            if let state = try await api.send("GET", "/me", account: session, as: AccountState.self) { apply(state, sent: sent) }
         } catch APIError.signedOut {
             forget()
         } catch {
@@ -198,8 +199,9 @@ final class AccountStore {
 
     private func push() async {
         guard let session = Keychain.session, current != synced else { return }
+        let sent = current
         do {
-            if let state = try await api.send("PUT", "/me", body: current, account: session, as: AccountState.self) { apply(state) }
+            if let state = try await api.send("PUT", "/me", body: sent, account: session, as: AccountState.self) { apply(state, sent: sent) }
         } catch APIError.signedOut {
             forget()
         } catch {
@@ -207,13 +209,16 @@ final class AccountStore {
         }
     }
 
-    /// Makes this iPhone match the account.
-    private func apply(_ state: AccountState) {
+    /// Makes this iPhone match the account. `sent`: this iPhone's state when
+    /// the request went out. A change made while it was out (a star during a
+    /// slow wake-up of the server) stays, and goes up next.
+    private func apply(_ state: AccountState, sent: SavedState) {
         let saved = SavedState(skaters: state.favorites, settings: state.settings)
         synced = saved
         account = state.account
         syncedAt = .now
         favorites.updateHelmets(from: state.favorites)
+        guard current == sent else { return localChanged() }
         guard current != saved else { return }
         favorites.replace(with: state.favorites)
         if let on = state.settings.notifyStarts { favorites.notifyStarts = on }

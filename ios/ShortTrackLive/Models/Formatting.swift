@@ -10,8 +10,15 @@ enum Fmt {
         return DateComponents(year: parts[0], month: parts[1], day: parts[2])
     }
 
+    /// "Oct": English like every other date in the app, whatever the phone's language.
+    private static let monthSymbols: [String] = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.shortMonthSymbols
+    }()
+
     private static func monthName(_ month: Int) -> String {
-        DateFormatter().shortMonthSymbols[month - 1]
+        monthSymbols.indices.contains(month - 1) ? monthSymbols[month - 1] : ""
     }
 
     /// "Oct 23–25", "Oct 30 – Nov 1", "Dec 30, 2026 – Jan 2, 2027".

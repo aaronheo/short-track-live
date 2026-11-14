@@ -43,7 +43,7 @@ struct PlacesCardView: View {
                     .foregroundStyle(Theme.faint)
             } else {
                 FlowLayout(spacing: 14, lineSpacing: 8) {
-                    ForEach(card.qualified.skaters, id: \.self) { skater in
+                    ForEach(Array(card.qualified.skaters.enumerated()), id: \.offset) { _, skater in
                         HStack(spacing: 5) {
                             FlagView(iso2: skater.iso2, nat: skater.nat, size: 13)
                             Text(skater.last)
@@ -175,7 +175,9 @@ struct FinishedHeats: View {
                         // Nothing more to see where ISU has no laps for the race.
                         if heat.entries.contains(where: { $0.laps > 0 }) {
                             RowDivider()
-                            Button { model.openHeat(heat.id) } label: {
+                            // A link, not model.openHeat: a round can be open in Search,
+                            // Standings or Profile too, and the heat goes on top of it there.
+                            NavigationLink(value: Route.heat(heat.id)) {
                                 HStack {
                                     Text("Lap times and race summary")
                                     Spacer()
@@ -302,7 +304,7 @@ struct LiveHeatCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Button { model.openHeat(heat.id) } label: {
+            NavigationLink(value: Route.heat(heat.id)) {
                 HStack(spacing: 10) {
                     Text(heat.name)
                         .font(.callout.weight(.bold))

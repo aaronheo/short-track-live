@@ -27,6 +27,9 @@ final class AppModel {
     // Wide:
     var sidebarPath: [Route] = []
     var detailRound: Int?
+    /// Bumped to rebuild the detail round when its schedule row is tapped
+    /// again after the round chips moved it to another round.
+    var detailGeneration = 0
     var detailPath: [Route] = []
 
     // Search tab. Phone: one stack (athlete → heat). Wide: results in the
@@ -53,9 +56,10 @@ final class AppModel {
         isSplit = split
         if split {
             sidebarPath = path.filter { if case .event = $0 { true } else { false } }
-            detailRound = path.lazy.compactMap { if case .round(let id) = $0 { id } else { nil } }.last
+            // The round on screen, after any switch with the chips.
+            detailRound = path.lazy.compactMap { if case .round(let id) = $0 { id } else { nil } }.last.map { visibleRound ?? $0 }
+            // A heat opened from a notification has no round under it; it stays.
             detailPath = path.filter { if case .heat = $0 { true } else { false } }
-            if detailRound == nil { detailPath = [] }
             // The search detail pane starts with the first athlete or conversation.
             searchAthlete = nil
             searchQuestion = nil
@@ -69,7 +73,7 @@ final class AppModel {
                 searchDetailPath = Array(searchPath.dropFirst())
             }
         } else {
-            path = sidebarPath + (detailRound.map { [Route.round($0)] } ?? []) + detailPath
+            path = sidebarPath + (detailRound.map { [Route.round(visibleRound ?? $0)] } ?? []) + detailPath
             let root: [Route] = searchQuestion.map { [.ask($0)] } ?? searchAthlete.map { [.athlete($0)] } ?? []
             searchPath = root + searchDetailPath
         }
@@ -130,6 +134,8 @@ final class AppModel {
         zoomSource = zoom ? id : nil
         if isSplit {
             if let slug, sidebarPath != [.event(slug)] { sidebarPath = [.event(slug)] }
+            // Already in the detail but the chips moved it on: show this one again.
+            if detailRound == id, visibleRound != id { detailGeneration += 1 }
             detailRound = id
             detailPath = []
         } else {

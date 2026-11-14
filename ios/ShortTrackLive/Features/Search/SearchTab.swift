@@ -179,7 +179,8 @@ private struct SearchResults: View {
                             .font(.callout)
                             .foregroundStyle(Theme.link)
                             .frame(width: 24)
-                        Text(question)
+                        // "500 m" stays on one line (it broke as "500 / m finals" on the Duo's cover screen).
+                        Text(question.replacingOccurrences(of: " m ", with: "\u{00A0}m "))
                             .font(.callout.weight(.medium))
                             .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.leading)
@@ -296,7 +297,7 @@ private struct SearchResults: View {
                             .lineLimit(1)
                         HelmetBadge(number: helmet)
                     }
-                    Text([Fmt.country(iso2: iso2, fallback: nat), gender, "\(races) races"].compactMap { $0 }.joined(separator: " · "))
+                    Text([Fmt.country(iso2: iso2, fallback: nat), gender, races == 1 ? "1 race" : "\(races) races"].compactMap { $0 }.joined(separator: " · "))
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                 }

@@ -9,6 +9,15 @@ struct PicksTab: View {
     @State private var path: [Int] = []
 
     var body: some View {
+        layout
+            // Folding or unfolding the Duo keeps the open race.
+            .onChange(of: split) { _, split in
+                if split { selected = path.last } else { path = selected.map { [$0] } ?? [] }
+            }
+    }
+
+    @ViewBuilder
+    private var layout: some View {
         if split {
             NavigationSplitView(columnVisibility: .constant(.all)) {
                 PicksHomeView(split: true, selected: $selected) { selected = $0 }

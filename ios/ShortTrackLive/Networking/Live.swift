@@ -15,6 +15,8 @@ final class Live<Value: Decodable & Sendable> {
     let path: String
     @ObservationIgnored private let interval: (Value) -> Duration?
     @ObservationIgnored private let client: APIClient
+    /// The ETag of `value`, this screen's own.
+    @ObservationIgnored private var etag: String?
 
     init(_ path: String, client: APIClient = .shared, interval: @escaping (Value) -> Duration?) {
         self.path = path
@@ -33,9 +35,9 @@ final class Live<Value: Decodable & Sendable> {
     func refresh() async {
         guard !path.isEmpty else { return }
         do {
-            if value == nil { await client.reset(path) }
-            if let fresh = try await client.get(path, as: Value.self) {
-                withAnimation(.snappy) { value = fresh }
+            if let fresh = try await client.get(path, etag: value == nil ? nil : etag, as: Value.self) {
+                etag = fresh.etag
+                withAnimation(.snappy) { value = fresh.value }
             }
             error = nil
         } catch is CancellationError {

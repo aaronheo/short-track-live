@@ -9,6 +9,8 @@ struct StandingsTab: View {
     @State private var season: String?
     @State private var live = StandingsTab.load(season: nil)
     @State private var selection: StandingSelection?
+    /// Pages opened on top of a skater in the detail pane (wide).
+    @State private var detailPath: [Route] = []
 
     private static func load(season: String?) -> Live<StandingsResponse> {
         Live(season.map { "standings/\(Fmt.seasonPath($0))" } ?? "standings") { _ in .seconds(300) }
@@ -27,7 +29,7 @@ struct StandingsTab: View {
                     .toolbar(removing: .sidebarToggle) // the sidebar stays open
                     .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 420)
             } detail: {
-                NavigationStack {
+                NavigationStack(path: $detailPath) {
                     Group {
                         if let selection, let data = live.value {
                             StandingDetail(selection: selection, book: StandingsBook(response: data), inSheet: false).id(selection)
@@ -40,6 +42,8 @@ struct StandingsTab: View {
                 }
             }
             .navigationSplitViewStyle(.balanced)
+            // Another skater replaces whatever was opened on top of the last one.
+            .onChange(of: selection) { detailPath = [] }
         } else {
             NavigationStack {
                 StandingsList(live: live, selection: $selection, split: false, pick: pick)
@@ -195,7 +199,7 @@ private struct StandingsList: View {
                     let selected = split && selection?.entry == entry && selection?.list == list
                     let row = StandingRow(entry: entry, compact: split,
                                           favorite: entry.skaterId.map(favorites.contains) ?? false,
-                                          gap: index == 0 ? (list.kind == "overall" ? "Leader" : nil) : "−\((leader - entry.points).formatted())")
+                                          gap: entry.points == leader ? (list.kind == "overall" ? "Leader" : nil) : "−\((leader - entry.points).formatted())")
                     // A plain rectangle behind the row (not a modifier on the button, which
                     // iOS clips to rounded corners), so the highlight runs edge to edge.
                     ZStack {

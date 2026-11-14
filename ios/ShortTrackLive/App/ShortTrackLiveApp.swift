@@ -191,7 +191,7 @@ private struct SplitLayout: View {
             NavigationStack(path: $model.detailPath) {
                 Group {
                     if let id = model.detailRound {
-                        RoundView(id: id).id(id)
+                        RoundView(id: id).id([id, model.detailGeneration])
                     } else {
                         ContentUnavailableView("Pick a race", systemImage: "list.bullet.rectangle",
                                                description: Text("Choose an event, then a race from its schedule."))
