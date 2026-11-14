@@ -154,7 +154,9 @@ export class PushDevices {
       }
     }
     if (device.notify_picks && device.account_id != null) {
-      const home = await this.picks.home(device.account_id, now);
+      // Every open race, not just the app's first 12: a round cut off there
+      // would otherwise get a second alert once its other races came into view.
+      const home = await this.picks.home(device.account_id, now, Infinity);
       alerts.push(...picksAlerts(home.open, home.event, sent));
     }
     return { alerts, activities };

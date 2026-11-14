@@ -496,16 +496,21 @@ describe('push alerts', () => {
 
   it('announces picks once per round', () => {
     const open = [
-      { heatId: 10, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 1', picked: false },
-      { heatId: 11, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 2', picked: false },
-      { heatId: 12, title: 'Men 500 m', round: 'Finals', race: 'Final A', picked: true },
+      { heatId: 10, roundId: 3, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 1', picked: false },
+      { heatId: 11, roundId: 3, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 2', picked: false },
+      { heatId: 12, roundId: 4, title: 'Men 500 m', round: 'Finals', race: 'Final A', picked: true },
     ];
     const alerts = picksAlerts(open, { name: 'World Tour #2', city: 'Montréal' }, new Set());
     expect(alerts).toEqual([{
-      id: 'picks-10', title: 'Picks are open: Women 1000 m semifinals', body: '2 races · Montréal. Lock in your order before the start.',
-      heatId: 10, link: 'pick', thread: 'picks', covers: ['picks-11'],
+      id: 'picks-round-3', title: 'Picks are open: Women 1000 m semifinals', body: '2 races · Montréal. Lock in your order before the start.',
+      heatId: 10, link: 'pick', thread: 'picks',
     }]);
-    expect(picksAlerts(open, null, new Set(['picks-10', 'picks-11']))).toEqual([]);
+    expect(picksAlerts(open, null, new Set(['picks-round-3']))).toEqual([]);
+    // Heat 1 has locked and heat 3's start list is out: still the same round, already announced.
+    const later = [open[1]!, { heatId: 13, roundId: 3, title: 'Women 1000 m', round: 'Semifinals', race: 'Semifinal · Heat 3', picked: false }];
+    expect(picksAlerts(later, null, new Set(['picks-round-3']))).toEqual([]);
+    // Sent before alerts were kept per round: one race's id stands for its round.
+    expect(picksAlerts(later, null, new Set(['picks-11']))).toEqual([]);
   });
 });
 

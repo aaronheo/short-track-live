@@ -71,7 +71,9 @@ export class Ingest {
           scheduledAt: scheduled.get(rnd.event_result_round_id) ?? null,
         });
       }
+      await this.dropUnlistedRounds(compId, comp.rounds.map((r) => r.event_result_round_id));
     }
+    await this.dropUnlistedCompetitions(loaded.eventId, tree.competitions.map((c) => c.event_result_id));
     const derived = await this.withStarts(named);
     await this.rebuildSchedule(loaded.eventId, tree.schedule, roundIds, roundKeys, derived);
     return loaded;
@@ -235,6 +237,8 @@ export class Ingest {
     // except for a start list that ISU has clearly returned only in part.
     const heatsToPrune = perHeat.filter((h) => !protectedHeats.has(h.heatId)).map((h) => h.heatId);
     if (heatsToPrune.length) {
+      const kept = [...entryIds.values()];
+      await this.movePicks(heatsToPrune.map((id) => ({ from: id, to: id })), kept);
       await this.db.query(`delete from entry where heat_id = any($1::int[]) and not (id = any($2::bigint[]))`,
         [heatsToPrune, [...entryIds.values()]]);
     }
@@ -264,7 +268,106 @@ export class Ingest {
            on conflict do nothing`, [JSON.stringify(members)]);
       }
     }
+    // After the entries, so a renumbered heat's picks can find their skaters in its replacement.
+    await this.dropUnlistedHeats(roundId, [...heatIds.values()]);
     await this.syncRoundStarts([roundId]);
+  }
+
+  /**
+   * Heats ISU no longer lists for a round. One left at "start list" would stay
+   * "up next" forever and keep its round polled, so it goes, unless it has an
+   * official result. As with entries, a response with fewer than half the
+   * heats we have is taken as partial and changes nothing.
+   */
+  private async dropUnlistedHeats(roundId: number, listed: number[]): Promise<void> {
+    const stored = (await this.db.query<{ id: number; official: boolean }>(
+      `select id, state = 'official' as official from heat where round_id = $1`, [roundId])).rows;
+    if (listed.length * 2 < stored.length) return;
+    const keep = new Set(listed);
+    await this.dropHeats(stored.filter((h) => !keep.has(h.id) && !h.official).map((h) => h.id));
+  }
+
+  /** Rounds ISU no longer lists for a competition: their heats go (as above), then the rounds left empty. */
+  async dropUnlistedRounds(competitionId: number, listedIsuIds: number[]): Promise<void> {
+    if (!listedIsuIds.length) return;
+    const stored = (await this.db.query<{ id: number; isu_id: number }>(
+      'select id, isu_id from round where competition_id = $1', [competitionId])).rows;
+    if (listedIsuIds.length * 2 < stored.length) return;
+    const keep = new Set(listedIsuIds);
+    await this.dropRounds(stored.filter((r) => !keep.has(r.isu_id)).map((r) => r.id));
+  }
+
+  /** Competitions ISU no longer lists for an event: their rounds go (as above), then the competitions left empty. */
+  async dropUnlistedCompetitions(eventId: number, listedIsuIds: number[]): Promise<void> {
+    if (!listedIsuIds.length) return;
+    const stored = (await this.db.query<{ id: number; isu_id: number }>(
+      'select id, isu_id from competition where event_id = $1', [eventId])).rows;
+    if (listedIsuIds.length * 2 < stored.length) return;
+    const keep = new Set(listedIsuIds);
+    const stale = stored.filter((c) => !keep.has(c.isu_id)).map((c) => c.id);
+    if (!stale.length) return;
+    await this.dropRounds((await this.db.query<{ id: number }>(
+      'select id from round where competition_id = any($1::int[])', [stale])).rows.map((r) => r.id));
+    await this.db.query(
+      `delete from competition c where c.id = any($1::int[]) and not exists (select 1 from round r where r.competition_id = c.id)`, [stale]);
+  }
+
+  private async dropRounds(roundIds: number[]): Promise<void> {
+    if (!roundIds.length) return;
+    await this.dropHeats((await this.db.query<{ id: number }>(
+      `select id from heat where round_id = any($1::int[]) and state <> 'official'`, [roundIds])).rows.map((h) => h.id));
+    await this.db.query(
+      `delete from round r where r.id = any($1::int[]) and not exists (select 1 from heat h where h.round_id = r.id)`, [roundIds]);
+  }
+
+  /**
+   * Deletes heats. Picks on one move to the heat that replaced it (same
+   * competition, round name and heat name), if ISU renumbered it; the rest go
+   * with the heat.
+   */
+  private async dropHeats(heatIds: number[]): Promise<void> {
+    if (!heatIds.length) return;
+    const moves = (await this.db.query<{ from: number; to: number }>(
+      `select distinct on (old.id) old.id as from, new.id as to
+       from heat old join round r_old on r_old.id = old.round_id
+       join round r_new on r_new.competition_id = r_old.competition_id and r_new.name = r_old.name
+       join heat new on new.round_id = r_new.id and new.name = old.name and not (new.id = any($1::int[]))
+       where old.id = any($1::int[]) and exists (select 1 from pick p where p.heat_id = old.id)
+       order by old.id, (new.round_id = old.round_id) desc, new.id`, [heatIds])).rows;
+    await this.movePicks(moves, []);
+    await this.db.query('delete from heat where id = any($1::int[])', [heatIds]);
+  }
+
+  /**
+   * Points picks at entries ISU has renumbered: a pick stores entry ids, and
+   * ISU sometimes replaces every entry of a heat with new ones (World Tour #1
+   * 2026). Each old entry maps to the new one for the same skater (or relay
+   * team). With `from` ≠ `to` the picks move to another heat too, unless the
+   * account already picked that one. With `from` = `to`, only entries not in
+   * `kept` are old.
+   */
+  private async movePicks(moves: { from: number; to: number }[], kept: number[]): Promise<void> {
+    if (!moves.length) return;
+    const remap = (col: string) => `coalesce((select array_agg(coalesce(m.new_id, x.id) order by x.ord)
+      from unnest(p.${col}) with ordinality as x(id, ord) left join pairs m on m.old_id = x.id), '{}')`;
+    await this.db.query(
+      `with moves as (select * from unnest($1::int[], $2::int[]) as mv(from_heat, to_heat)),
+       pairs as (
+         select distinct on (o.id) o.id as old_id, n.id as new_id
+         from moves mv join entry o on o.heat_id = mv.from_heat join entry n on n.heat_id = mv.to_heat
+         where n.id <> o.id
+           and (mv.from_heat <> mv.to_heat or (not (o.id = any($3::bigint[])) and n.id = any($3::bigint[])))
+           and ((o.skater_id is not null and n.skater_id = o.skater_id)
+             or (o.skater_id is null and n.skater_id is null and (n.team_id = o.team_id or n.nation = o.nation)))
+         order by o.id, (n.team_id is not distinct from o.team_id) desc, n.id)
+       update pick p set heat_id = mv.to_heat, finish = ${remap('finish')}, penalized = ${remap('penalized')}, advanced = ${remap('advanced')}
+       from moves mv
+       where p.heat_id = mv.from_heat
+         and (mv.from_heat <> mv.to_heat
+           or exists (select 1 from pairs m where m.old_id = any(p.finish || p.penalized || p.advanced)))
+         and (mv.from_heat = mv.to_heat
+           or not exists (select 1 from pick q where q.account_id = p.account_id and q.heat_id = mv.to_heat))`,
+      [moves.map((m) => m.from), moves.map((m) => m.to), kept]);
   }
 
   private async skaters(list: IsuSkater[]): Promise<Map<number, number>> {

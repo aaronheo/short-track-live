@@ -15,10 +15,10 @@ export interface PushRace {
   result: AlertText | null;
 }
 
-export interface PushOpenPick { heatId: number; title: string; round: string | null; race: string; picked: boolean }
+export interface PushOpenPick { heatId: number; roundId: number; title: string; round: string | null; race: string; picked: boolean }
 
 export interface PushAlert extends AlertText {
-  id: string; // "start-<heat>", "result-<heat>", "picks-<heat>"
+  id: string; // "start-<heat>", "result-<heat>", "picks-round-<round>"
   /** What a tap opens: shorttrack://<link>/<heatId>. */
   link: 'heat' | 'pick';
   heatId: number;
@@ -54,20 +54,29 @@ export function raceAlerts<R extends PushRace>(races: R[], added: Map<number, Da
   return out;
 }
 
-/** One "Picks are open" per round whose races aren't picked or announced yet. */
+/**
+ * One "Picks are open" per round, ever: for its open races not yet picked,
+ * and never again once sent, however its races come into the open list
+ * (start lists arrive heat by heat). Alerts sent before they were kept per
+ * round were "picks-<heat>" for each of the round's races; any of those
+ * counts as the round's alert too.
+ */
 export function picksAlerts(open: PushOpenPick[], event: { name: string; city: string | null } | null, sent: Set<string>): PushAlert[] {
-  const rounds = new Map<string, PushOpenPick[]>();
+  const rounds = new Map<number, PushOpenPick[]>();
+  const done = new Set<number>();
   for (const race of open) {
-    if (race.picked || sent.has(`picks-${race.heatId}`)) continue;
-    const name = [race.title, race.round?.toLowerCase()].filter(Boolean).join(' ');
-    rounds.set(name, [...(rounds.get(name) ?? []), race]);
+    if (sent.has(`picks-${race.heatId}`) || sent.has(`picks-round-${race.roundId}`)) done.add(race.roundId);
+    if (race.picked) continue;
+    rounds.set(race.roundId, [...(rounds.get(race.roundId) ?? []), race]);
   }
   const place = event ? ` · ${event.city ?? event.name}` : '';
-  return [...rounds].map(([name, races]) => ({
-    id: `picks-${races[0]!.heatId}`,
-    title: `Picks are open: ${name}`,
-    body: `${races.length === 1 ? races[0]!.race : `${races.length} races`}${place}. Lock in your order before the start.`,
-    heatId: races[0]!.heatId, link: 'pick' as const, thread: 'picks',
-    covers: races.slice(1).map((r) => `picks-${r.heatId}`),
-  }));
+  return [...rounds].filter(([roundId]) => !done.has(roundId)).map(([roundId, races]) => {
+    const name = [races[0]!.title, races[0]!.round?.toLowerCase()].filter(Boolean).join(' ');
+    return {
+      id: `picks-round-${roundId}`,
+      title: `Picks are open: ${name}`,
+      body: `${races.length === 1 ? races[0]!.race : `${races.length} races`}${place}. Lock in your order before the start.`,
+      heatId: races[0]!.heatId, link: 'pick' as const, thread: 'picks',
+    };
+  });
 }

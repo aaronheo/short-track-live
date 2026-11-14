@@ -82,11 +82,13 @@ export class SyncWorker {
           this.log(`database is over ${Math.round(opts.maxDbBytes / 1e6)} MB; stopping the backfill here`);
           return;
         }
-        await this.ingest.upsertEvent(ev);
-        if (eventState(ev.state) === 'upcoming') continue;
-        if (await this.upToDate(ev.slug)) continue;
         for (let attempt = 1; ; attempt++) {
           try {
+            // Inside the try: one event ISU sends malformed mustn't stop the
+            // backfill (and with it the server's startup).
+            await this.ingest.upsertEvent(ev);
+            if (eventState(ev.state) === 'upcoming') break;
+            if (await this.upToDate(ev.slug)) break;
             await this.pullWholeEvent(ev);
             break;
           } catch (err) {
@@ -181,11 +183,16 @@ export class SyncWorker {
       this.isu.recording = live.length > 0;
       const events = await this.seniorEvents(current);
       this.isu.recording = false;
-      for (const ev of events) await this.ingest.upsertEvent(ev);
+      // Each event on its own: one that fails (bad data from ISU) is logged
+      // and tried again next time, without holding up the others or the
+      // live polling below.
+      for (const ev of events) await this.guard(ev.name, () => this.ingest.upsertEvent(ev));
       this.log(`refreshed ${current} event list`);
       // Finished events that haven't settled, fetched again for ISU's corrections.
       for (const ev of events) {
-        if (eventState(ev.state) === 'finished' && !(await this.upToDate(ev.slug))) await this.pullWholeEvent(ev, now);
+        await this.guard(ev.name, async () => {
+          if (eventState(ev.state) === 'finished' && !(await this.upToDate(ev.slug))) await this.pullWholeEvent(ev, now);
+        });
       }
     }
 
@@ -199,12 +206,12 @@ export class SyncWorker {
       if (!rounds.some((r) => r.running)
         && now - (this.lastStructure.get(ev.id) ?? 0) >= STRUCTURE_EVERY) {
         this.lastStructure.set(ev.id, now);
-        await this.refreshStructure(ev);
+        await this.guard(ev.slug, () => this.refreshStructure(ev));
       }
       if (!rounds.some((r) => r.running)) await this.pollRounds(rounds.filter((r) => !r.hot), now);
       if (ev.state === 'finished' && now - (this.lastFinishCheck.get(ev.id) ?? 0) >= FINISH_CHECK_EVERY) {
         this.lastFinishCheck.set(ev.id, now);
-        await this.finishEvent(ev, now);
+        await this.guard(ev.slug, () => this.finishEvent(ev, now));
       }
     }
     this.isu.recording = false;
@@ -258,7 +265,9 @@ export class SyncWorker {
         roundKeys.set(norm(comp.name) + '|' + norm(r.name), rid);
         named.push({ title: competitionName(comp.name, comp.gender, isRelay(comp)), label: roundName(r.name), roundId: rid });
       }
+      await this.ingest.dropUnlistedRounds(compId, rounds.map((r) => r.event_result_round_id));
     }
+    await this.ingest.dropUnlistedCompetitions(ev.id, comps.map((c) => c.event_result_id));
     const derived = await this.ingest.withStarts(named);
     await this.ingest.rebuildSchedule(ev.id, await this.isu.schedule(ev.slug), roundIds, roundKeys, derived);
     if (comps.length && comps.every((c) => eventState(c.status) === 'finished')) {
@@ -293,8 +302,24 @@ export class SyncWorker {
       const every = r.hot ? HOT_HEATS_EVERY : START_LISTS_EVERY;
       if (now - (this.lastHeats.get(r.id) ?? 0) < every) continue;
       this.lastHeats.set(r.id, now);
-      const heats = await this.isu.heats(r.comp_isu_id, r.isu_id, r.is_relay);
-      await this.ingest.loadRoundHeats(r.isu_id, heats, r.is_relay);
+      await this.guard(`round ${r.isu_id}`, async () => {
+        const heats = await this.isu.heats(r.comp_isu_id, r.isu_id, r.is_relay);
+        await this.ingest.loadRoundHeats(r.isu_id, heats, r.is_relay);
+      });
+    }
+  }
+
+  /**
+   * Runs one event's (or round's) work, logging a failure instead of letting
+   * it end the tick. A lost database connection still ends it: nothing else
+   * would work either, and run() backs off.
+   */
+  private async guard(what: string, work: () => Promise<unknown>): Promise<void> {
+    try {
+      await work();
+    } catch (err) {
+      if (isConnectionError(err)) throw err;
+      this.log(`${what}: ${(err as Error).message}; skipped this time`);
     }
   }
 

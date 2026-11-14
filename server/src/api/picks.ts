@@ -13,6 +13,7 @@ export interface PickSummary {
   title: string; // "Women 1000 m"
   race: string; // "Semifinal · Heat 2", "Final A"
   round: string; // "Semifinals": picks-open alerts come one per round
+  roundId: number;
   startsAt: string | null;
   timeZone: string; // the venue's, for showing startsAt
   state: HeatState;
@@ -65,7 +66,7 @@ export interface PickHeatView {
 export type SaveResult = PickHeatView | 'not_found' | 'locked' | 'invalid' | 'needs_nickname';
 
 interface HeatRow {
-  id: number; name: string; state: HeatState; starts_at: Date | null; round: string; auto_places: number | null; destination: string | null;
+  id: number; name: string; state: HeatState; starts_at: Date | null; round: string; round_id: number; auto_places: number | null; destination: string | null;
   competition: string; event_id: number; event_name: string; city: string | null; time_zone: string;
 }
 
@@ -103,11 +104,12 @@ export class Picks {
     }));
   }
 
-  private isLocked(heat: Pick<HeatRow, 'state'>, locksAt: Date | null | undefined): boolean {
-    return !OPEN.includes(heat.state) || (locksAt != null && locksAt <= this.now());
+  private isLocked(heat: Pick<HeatRow, 'state'>, locksAt: Date | null | undefined, now = this.now()): boolean {
+    return !OPEN.includes(heat.state) || (locksAt != null && locksAt <= now);
   }
 
-  async home(accountId: number | null, now: Date): Promise<PicksHome> {
+  /** `openLimit`: how many open heats to list (the app shows 12; push alerts need them all). */
+  async home(accountId: number | null, now: Date, openLimit = 12): Promise<PicksHome> {
     const nickname = accountId ? (await this.db.query<{ nickname: string | null }>(
       'select nickname from account where id = $1', [accountId])).rows[0]?.nickname ?? null : null;
     // The live event; else one that ended in the last 3 days (for scores); else the next one.
@@ -127,7 +129,7 @@ export class Picks {
     if (!event || accountId == null) return base;
 
     const heats = (await this.db.query<HeatRow & { entries: number }>(
-      `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
+      `select h.id, h.name, h.state, h.starts_at, r.name as round, r.id as round_id, r.auto_places, r.destination, c.name as competition,
          c.event_id, coalesce(e.short_name, e.name) as event_name, e.city, e.time_zone, (select count(*) from entry en where en.heat_id = h.id)::int as entries
        from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where c.event_id = $1 and r.name = any($2)
@@ -138,7 +140,7 @@ export class Picks {
     const summary = (h: HeatRow): PickSummary => {
       const s = mine.get(h.id);
       return {
-        heatId: h.id, ...summaryTitle(h), round: h.round, startsAt: h.starts_at?.toISOString() ?? null, timeZone: h.time_zone, state: h.state,
+        heatId: h.id, ...summaryTitle(h), round: h.round, roundId: h.round_id, startsAt: h.starts_at?.toISOString() ?? null, timeZone: h.time_zone, state: h.state,
         picked: !!s, points: s?.score?.points ?? null, max: s?.score?.max ?? null,
       };
     };
@@ -162,7 +164,7 @@ export class Picks {
       event: { slug: event.slug, name: shortEventName(event.name), city: event.city, state: event.state },
       // Once someone has made a pick, keep the heat in their editable picks
       // rather than also offering it again in the next-pick queue.
-      open: heats.filter((h) => !this.isLocked(h, locks.get(h.id)) && h.entries >= 2 && !mine.has(h.id)).slice(0, 12).map(summary),
+      open: heats.filter((h) => !this.isLocked(h, locks.get(h.id), now) && h.entries >= 2 && !mine.has(h.id)).slice(0, openLimit).map(summary),
       mine: heats.filter((h) => mine.has(h.id)).reverse().map(summary),
       me: accountId ? { points: meRow?.points ?? 0, picked: mine.size, rank: meRow?.rank ?? null } : null,
       players: totals.size,
@@ -250,7 +252,7 @@ export class Picks {
 
   private async heatRow(heatId: number): Promise<HeatRow | null> {
     return (await this.db.query<HeatRow>(
-      `select h.id, h.name, h.state, h.starts_at, r.name as round, r.auto_places, r.destination, c.name as competition,
+      `select h.id, h.name, h.state, h.starts_at, r.name as round, r.id as round_id, r.auto_places, r.destination, c.name as competition,
          c.event_id, coalesce(e.short_name, e.name) as event_name, e.city, e.time_zone
        from heat h join round r on r.id = h.round_id join competition c on c.id = r.competition_id join event e on e.id = c.event_id
        where h.id = $1 and r.name = any($2)`, [heatId, PICKABLE_ROUNDS])).rows[0] ?? null;
