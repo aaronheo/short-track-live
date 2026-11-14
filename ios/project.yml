@@ -63,6 +63,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIBackgroundModes: [fetch]
+        # Only HTTPS and the Keychain: exempt, so TestFlight doesn't ask about export compliance.
+        ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         BGTaskSchedulerPermittedIdentifiers: [com.aaronheo.shorttracklive.refresh]
