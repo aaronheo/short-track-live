@@ -116,12 +116,12 @@ export class SyncWorker {
     return Number(res.rows[0]!.bytes);
   }
 
-  private async pullWholeEvent(ev: IsuEvent): Promise<void> {
+  private async pullWholeEvent(ev: IsuEvent, now = Date.now()): Promise<void> {
     const before = this.isu.requests;
     // Settled events can come from the disk cache; newer ones are fetched
     // fresh, since ISU keeps correcting results for days after an event.
     const settled = eventState(ev.state) === 'finished'
-      && Date.parse(isuLocalDate(ev.to_date)) < Date.now() - SETTLE_DAYS * 86_400_000;
+      && Date.parse(isuLocalDate(ev.to_date)) < now - SETTLE_DAYS * 86_400_000;
     const tree = await this.isu.pullEvent(ev, settled);
     const client = await this.pool.connect();
     // A connection that drops mid-transaction also emits 'error' on the
@@ -185,7 +185,7 @@ export class SyncWorker {
       this.log(`refreshed ${current} event list`);
       // Finished events that haven't settled, fetched again for ISU's corrections.
       for (const ev of events) {
-        if (eventState(ev.state) === 'finished' && !(await this.upToDate(ev.slug))) await this.pullWholeEvent(ev);
+        if (eventState(ev.state) === 'finished' && !(await this.upToDate(ev.slug))) await this.pullWholeEvent(ev, now);
       }
     }
 
@@ -204,7 +204,7 @@ export class SyncWorker {
       if (!rounds.some((r) => r.running)) await this.pollRounds(rounds.filter((r) => !r.hot), now);
       if (ev.state === 'finished' && now - (this.lastFinishCheck.get(ev.id) ?? 0) >= FINISH_CHECK_EVERY) {
         this.lastFinishCheck.set(ev.id, now);
-        await this.finishEvent(ev);
+        await this.finishEvent(ev, now);
       }
     }
     this.isu.recording = false;
@@ -304,10 +304,10 @@ export class SyncWorker {
   }
 
   /** A full, fresh pull of an event that has just ended (then daily until it settles). */
-  private async finishEvent(ev: { id: number; slug: string }): Promise<void> {
+  private async finishEvent(ev: { id: number; slug: string }, now: number): Promise<void> {
     const events = await this.seniorEvents((await this.seasons()).current);
     const isuEvent = events.find((e) => e.slug === ev.slug);
-    if (isuEvent && eventState(isuEvent.state) === 'finished') await this.pullWholeEvent({ ...isuEvent });
+    if (isuEvent && eventState(isuEvent.state) === 'finished') await this.pullWholeEvent({ ...isuEvent }, now);
   }
 
 }

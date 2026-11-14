@@ -81,12 +81,13 @@ At high speeds the worker checks less often in virtual time: a tick every ¼ s r
 
 ## Automated scenario tests
 
-`tests/replay.test.ts` plays the men's 500 m finals on Oct 31 through the real worker and API, and checks the round at each step:
-1. both finals are start lists;
-2. Final B is official;
-3. Final A is running, and the events list's live card points at it;
-4. Final A has 5 ranked results;
-5. Final A is official with 4 ranked (one skater was penalized), and the round is finished.
+`tests/replay.test.ts` plays three moments from Montréal through the real worker and API, each from a small slice in `data/recordings/`:
+
+| Scenario | Slice | What it checks |
+| --- | --- | --- |
+| Men's 500 m finals, Oct 31 | `wt2-montreal-2026-men-500m-finals` | Start lists → Final B official → Final A running (and on the Events live card as "Final A") → 5 ranked → official with 4 ranked after a penalty, round finished |
+| Men's 1500 m quarterfinal heat 7, Oct 30 | `wt2-montreal-2026-men-1500m-qf` | Two people pick; picks lock at the planned start of the race two ahead (a late change gets 409). The unofficial result has Kruzbergs 3rd and isn't scored. Official: Kruzbergs penalized, Pelletier advanced (ADV), scores 20 of 22 and 3, leaderboard in that order |
+| Men's 1500 m repechage quarterfinal, Nov 1 | `wt2-montreal-2026-men-1500m-rep-qf-correction` | A heat official since the day before gets a penalty added when ISU marks the event finished; the worker's re-pull of the finished event picks it up |
 
 It runs with the other database tests:
 
