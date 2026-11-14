@@ -24,9 +24,14 @@ const genderIn = (text: string): StandingGender | null =>
 /**
  * The World Tour / World Cup classifications (ISU types WCO, WCT, WCD); null
  * for the World Ranking lists (WR*) and the Junior World Cup's, which we leave out.
+ * From 2026/27 ISU names the junior lists exactly like the senior ones ("World
+ * Tour Classification by discipline Men 500 m"); only `identifier` ("…_Junior")
+ * and `level_name` say junior.
  */
-export function classifyStanding(list: Pick<IsuStandingList, 'type' | 'gender' | 'discipline_name' | 'name'>): StandingInfo | null {
-  if (/junior/i.test(list.name)) return null;
+export function classifyStanding(
+  list: Pick<IsuStandingList, 'type' | 'gender' | 'discipline_name' | 'name' | 'identifier' | 'level_name'>,
+): StandingInfo | null {
+  if (/junior/i.test(`${list.name} ${list.identifier ?? ''} ${list.level_name ?? ''}`)) return null;
   const gender = genderIn(list.gender) ?? genderIn(list.discipline_name);
   if (list.type === 'WCO') return gender === 'Mixed' ? null : { kind: 'overall', gender, distance: null };
   if (list.type === 'WCT') return { kind: 'nations', gender: 'Mixed', distance: null };

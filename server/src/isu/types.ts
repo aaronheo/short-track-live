@@ -135,6 +135,10 @@ export interface IsuStandingList {
   world_standings_list_fsk_id: number;
   season_id: number; // ISU's, our season.isu_id
   name: string; // "Overall World Tour Classification Women"
+  /** "2026_STK_WCD_500_Men_Senior", "2026_STK_WCD_500_Men_Junior": says Junior where `name` may not. */
+  identifier?: string;
+  /** "Senior" | "Junior"; missing from older responses. */
+  level_name?: string | null;
   gender: string; // "Men" | "Women" | "Mixed"; "" before 2024/25
   discipline_name: string; // "Women 500 m", "Men Relay 5000 m", "Mixed Relay 2000 m"; "" for overall
   type: string; // WCO overall, WCT nations, WCD by distance; WRO/WRD World Ranking

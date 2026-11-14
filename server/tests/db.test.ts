@@ -338,6 +338,33 @@ describe.skipIf(!url)('database + API', () => {
       expect(await new StandingsSync(source, pool, () => {}).refresh()).toBe(0);
     });
 
+    it('drops a junior list ISU named like a senior one, so a distance isn\'t listed twice', async () => {
+      // From 2026/27 ISU's junior lists have the senior names; only the identifier says Junior.
+      // An older sync stored one beside the senior Men 500 m.
+      const junior = { ...fixture.list.data.find((l) => l.world_standings_list_fsk_id === 4266)!,
+        world_standings_list_fsk_id: 4422, identifier: '2026_STK_WCD_500_Men_Junior', level_name: 'Junior' };
+      const { id: season } = await one<{ id: number }>('select id from season where isu_id = 47');
+      await pool.query(
+        `insert into standing (id, season_id, kind, gender, distance, name, isu_updated_at) values ($1, $2, 'distance', 'Men', '500', $3, $4)`,
+        [junior.world_standings_list_fsk_id, season, junior.name, junior.updated_at]);
+      await pool.query(`insert into standing_entry (standing_id, position, rank, points, name, per_event) values (4422, 1, 1, 160, 'A Junior', '{160}')`);
+      const { body: before } = await request(app).get('/standings').expect(200);
+      expect(before.lists.filter((l: { gender: string; distance: string }) => l.gender === 'Men' && l.distance === '500')).toHaveLength(2);
+
+      const withJunior = { ...source, async standingLists(id: number) { return [...await source.standingLists(id), junior]; } };
+      const log: string[] = [];
+      expect(await new StandingsSync(withJunior, pool, (m) => log.push(m)).refresh()).toBe(0);
+      expect(log).toEqual(['2026/2027: removed 1 standings we don\'t keep (4422)']);
+      expect(await one<{ n: number }>('select count(*)::int as n from standing_entry where standing_id = 4422')).toEqual({ n: 0 });
+      const { body } = await request(app).get('/standings').expect(200);
+      const keys = (body.lists as { gender: string; kind: string; distance: string | null }[]).map((l) => `${l.gender} ${l.distance ?? l.kind}`);
+      expect(new Set(keys).size).toBe(keys.length);
+      // An empty answer from ISU (an outage) removes nothing.
+      const empty = { ...source, async standingLists() { return []; } };
+      await new StandingsSync(empty, pool, () => {}).refresh();
+      expect(await one<{ n: number }>('select count(*)::int as n from standing')).toEqual({ n: 15 });
+    });
+
     it('GET /standings?season= has a past season, its events matched by date', async () => {
       const { body } = await request(app).get('/standings/2025-2026').expect(200);
       await request(app).get('/standings/2018-2019').expect(404);

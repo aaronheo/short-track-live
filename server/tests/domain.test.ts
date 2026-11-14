@@ -369,6 +369,11 @@ describe('standings', () => {
     expect(genderOfSkaters(['F', 'F', 'M', null])).toBe('Women');
     expect(genderOfSkaters([])).toBeNull();
     expect(classifyStanding(list('WCD', 'Junior World Cup Classification by discipline Men 500 m', 'Men 500 m', 'Men'))).toBeNull();
+    // 2026/27: a junior list with the senior name; only its identifier and level say so.
+    const senior = { type: 'WCD', name: 'World Tour Classification by discipline Men 500 m', discipline_name: 'Men 500 m', gender: 'Men' };
+    expect(classifyStanding({ ...senior, identifier: '2026_STK_WCD_500_Men_Senior', level_name: 'Senior' })).toEqual({ kind: 'distance', gender: 'Men', distance: '500' });
+    expect(classifyStanding({ ...senior, identifier: '2026_STK_WCD_500_Men_Junior', level_name: 'Junior' })).toBeNull();
+    expect(classifyStanding({ ...senior, identifier: '2026_STK_WCD_500_Men_Junior' })).toBeNull();
     expect([standingPoints('100'), standingPoints('(60)'), standingPoints(''), standingPoints(undefined)]).toEqual([100, null, null, null]);
   });
 

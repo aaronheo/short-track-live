@@ -46,7 +46,17 @@ export class StandingsSync {
       'select id, isu_updated_at from standing where season_id = $1', [season.id])).rows
       .map((r) => [r.id, r.isu_updated_at?.getTime() ?? 0]));
     let loaded = 0;
-    for (const list of await this.isu.standingLists(season.isu_id)) {
+    const lists = await this.isu.standingLists(season.isu_id);
+    // A stored list we no longer keep (a junior list ISU named like a senior
+    // one, before we could tell) goes, or the app shows that distance twice.
+    // Only on a full answer from ISU: an empty one keeps what we have.
+    const kept = new Set(lists.filter((l) => classifyStanding(l)).map((l) => l.world_standings_list_fsk_id));
+    const gone = lists.length ? [...stored.keys()].filter((id) => !kept.has(id)) : [];
+    if (gone.length) {
+      await this.pool.query('delete from standing where id = any($1::int[])', [gone]);
+      this.log(`${season.title}: removed ${gone.length} standings we don't keep (${gone.join(', ')})`);
+    }
+    for (const list of lists) {
       const info = classifyStanding(list);
       if (!info || stored.get(list.world_standings_list_fsk_id) === Date.parse(list.updated_at)) continue;
       const entries = (await this.isu.standing(list.world_standings_list_fsk_id, list.team_type === 'Couples'))
