@@ -122,7 +122,7 @@ Done Oct 30 in another session (commits 7cf3244 → 453ef36):
 
 ## In flight right now
 
-- **Recording is off.** It took 30–50 MB per weekend and pushed the database to 260 MB of Supabase's 500 MB free tier. On 2026-11-13 junior events were dropped from the app and deleted, along with their recordings; recording now needs `ISU_RECORD=1`. What's kept is World Tour #2 in Montréal (Oct 29 – Nov 2, 2026): 33,244 rows, 45 MB. The database is at 110 MB.
+- **Recording is off.** It took 30–50 MB per weekend and pushed the database to 260 MB of Supabase's 500 MB free tier. On 2026-11-13 junior events were dropped from the app and deleted, along with their recordings; recording now needs `ISU_RECORD=1`. World Tour #2 in Montréal (Oct 29 – Nov 2, 2026, 33,244 responses) was exported to `server/recordings/wt2-montreal-2026.ndjson.gz` on Aaron's Mac (the only full copy) and then deleted from the database, which is now at 64 MB.
 - **Uncommitted work in the working tree** (Aaron's, from the Oct 30 session; tests pass, not deployed):
   - **ADV picks**: a skater can be picked as advanced by the referee (ADV button beside PEN). Penalties and advancements both score 5 now (places still 3 / 1). `PUT /picks/heats/:id` takes `advanced`; scoring counts an `ADV…` qualification code. Needs migration `0011_pick_advancements.sql` (untracked file; **already applied in production**). The app decodes picks without `advanced` as empty, so it works against the deployed server too.
   - **Leaderboard** moved off the Picks home: the score card opens it as its own screen.
@@ -136,7 +136,7 @@ Done Oct 30 in another session (commits 7cf3244 → 453ef36):
 Aaron's goal is to test the live features thoroughly before calling this production quality. The agreed plan, step 1 done:
 
 1. ✅ **Record real live weekends.** `isu_recording(fetched_at, key, method, path, body, hash, data gzip)`. One row per changed response during live polling. Montréal (World Tour #2, 2026) is the recording to build on; recording is now off (`ISU_RECORD=1` turns it on). Read rows with `gunzipSync(row.data)`.
-2. ✅ **Fake ISU server.** `isu/fake.ts`: `FakeIsu` (an `IsuClient` `fetchImpl` answering from a recording) and `VirtualClock`. `npm run replay:live` runs the real worker and API on it against a local database (port 4310, clock control on 4311). The Montréal recording is exported to `server/recordings/` (gitignored, `npm run recording:export`). How to use it: `server/TESTING.md`.
+2. ✅ **Fake ISU server.** `isu/fake.ts`: `FakeIsu` (an `IsuClient` `fetchImpl` answering from a recording) and `VirtualClock`. `npm run replay:live` runs the real worker and API on it against a local database (port 4310, clock control on 4311). The Montréal recording is a file in `server/recordings/` (gitignored, only on Aaron's Mac; no longer in the database). How to use it: `server/TESTING.md`.
 3. **Scenario tests in vitest** on top of it (`tests/replay.test.ts`: the men's 500 m finals; picks lock, a penalty plus an ADV, and scoring in a 1500 m quarterfinal; a correction after the event; see `server/TESTING.md`. `npm run recording:slice` cuts more). Still to cover: Picks open when a QF goes official; the 3-minute lock for the first race after a break; a re-run heat; the schedule slipping; ISU erroring mid-round.
 4. **A test server for the phone.** A second Render service in simulation mode with its own database (never production), and a hidden Debug-only control in Profile for event, speed and jump time.
 

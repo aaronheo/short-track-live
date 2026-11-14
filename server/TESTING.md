@@ -22,11 +22,7 @@ What we have recorded is **World Tour #2 in Montréal, Oct 30 – Nov 1, 2026**:
    ```
    (Without `LC_ALL` it fails with "postmaster became multithreaded".) The replay creates and wipes its own database, `shorttrack_replay`. `REPLAY_DATABASE_URL` points it elsewhere, but only at a local database: it is wiped on every start.
 
-2. **The recording file**, `server/recordings/wt2-montreal-2026.ndjson.gz` (about 18 MB, gitignored). Copy it out of the production database once:
-   ```bash
-   cd server && npm run recording:export
-   ```
-   This only reads `isu_recording`, using `DATABASE_URL` from `server/.env`. The defaults are Montréal's dates; for another weekend, pass `--from 2026-11-19 --to 2026-11-24 --out recordings/<name>.ndjson.gz`.
+2. **The recording file**, `server/recordings/wt2-montreal-2026.ndjson.gz` (about 18 MB, gitignored). It was exported from the database on 2026-11-13, and the rows were then deleted to free space. **This file on Aaron's Mac is the only full copy**; back it up, and copy it into `server/recordings/` on any other machine. `npm run recording:export` only helps for a weekend recorded later (see the end of this page): it reads `isu_recording` using `DATABASE_URL` from `server/.env`, for example with `--from 2026-11-19 --to 2026-11-24 --out recordings/<name>.ndjson.gz`.
 
 ## Replaying a weekend for the app
 
@@ -124,4 +120,3 @@ Recording is off, because a weekend takes 30–50 MB of the 500 MB database. To 
 2. Export the weekend with `npm run recording:export -- --from <day before> --to <day after> --out recordings/<name>.ndjson.gz`.
 3. With Aaron's OK, delete those rows from `isu_recording`, then run `vacuum full isu_recording` to hand the space back.
 
-The Montréal rows are still in the database. Once everyone who needs the file has it, they can go the same way (45 MB).
