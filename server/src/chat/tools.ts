@@ -17,6 +17,8 @@ export interface ToolResult {
 type Args = Record<string, unknown>;
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+/** Ways out of chat_reader: setting `role` (set_config), running SQL from a string (query_to_xml and kin), other databases. */
+const UNSAFE_SQL = /set_config|_to_xml|dblink/i;
 const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) ? v : typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : null);
 
 const SCHEMA = `Tables (Postgres):
@@ -224,12 +226,20 @@ export class ChatTools {
     if (!/^(select|with)\b/i.test(sql) || sql.includes(';')) {
       return { data: { error: 'Only one SELECT statement is allowed.' }, step };
     }
+    // Postgres checks a role switch against the session user, not chat_reader,
+    // so a query that calls set_config('role', ...) leaves chat_reader and can
+    // read accounts. The *_to_xml functions run SQL from a string, which would
+    // get set_config past a check on the text. Neither has a use in a results question.
+    if (UNSAFE_SQL.test(sql)) return { data: { error: 'That function isn’t allowed.' }, step };
     const client = await this.pool.connect();
     try {
       await client.query('begin read only');
       await client.query("set local statement_timeout = '5s'");
       await client.query('set local role chat_reader');
       const res = await client.query(`select * from (${sql}) as q limit 200`);
+      // Whatever got past the check above: rows read as anyone else are dropped.
+      const { rows: [who] } = await client.query<{ role: string }>('select current_user as role');
+      if (who?.role !== 'chat_reader') return { data: { error: 'That query isn’t allowed.' }, step };
       return { data: { rows: res.rows, rowCount: res.rowCount, truncated: res.rowCount === 200 }, step };
     } catch (err) {
       return { data: { error: (err as Error).message }, step };

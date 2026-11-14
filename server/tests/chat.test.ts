@@ -64,6 +64,11 @@ describe.skipIf(!url)('Ask', () => {
       'select 1; delete from lap',
       "with gone as (delete from lap returning 1) select count(*) from gone",
       "select pg_read_file('/etc/hosts')",
+      // Leaving chat_reader: Postgres checks a role switch against the session user.
+      "with x as materialized (select set_config('role', 'none', true)) select query_to_xml('select * from account', true, false, '') from x",
+      "select pg_catalog.SET_CONFIG('role', 'none', true), (select count(*) from heat)",
+      "select query_to_xml('select set_' || 'config(''role'', ''none'', true)', true, false, '')",
+      "select table_to_xml('account', true, false, '')",
     ]) {
       const res = await tools.run('run_sql', { sql, purpose: 'Bad query' });
       expect((res.data as { error?: string }).error, sql).toBeTruthy();
