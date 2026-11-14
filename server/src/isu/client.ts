@@ -7,6 +7,8 @@ import type {
 } from './types.js';
 
 const BASE = 'https://front-api.isu.org';
+/** One page of standing lists; a season has about 30. */
+export const STANDING_LISTS_PAGE = 100;
 export const SHORT_TRACK = 3; // discipline_id: 1 figure, 2 synchro, 3 short track, 4 speed skating
 
 type Body = { json?: unknown; form?: Record<string, string | number> };
@@ -92,7 +94,7 @@ export class IsuClient {
   /** ISU's published standings for one season (`seasonId` is ISU's, our season.isu_id). */
   async standingLists(seasonId: number): Promise<IsuStandingList[]> {
     return (await this.call<IsuStandingList[] | null>('POST', '/events/get-world-standings-list', {
-      json: { page: 1, discipline_id: SHORT_TRACK, season_id: seasonId, pagesize: 100 },
+      json: { page: 1, discipline_id: SHORT_TRACK, season_id: seasonId, pagesize: STANDING_LISTS_PAGE },
     }, false)) ?? [];
   }
 

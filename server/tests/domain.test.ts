@@ -100,6 +100,9 @@ describe('normalize', () => {
     expect(isJunior({ name: 'ISU World Junior Short Track Championships 2020 - Bormio (ITA)', event_sub_type_name: 'World Junior Championships' })).toBe(true);
     expect(isJunior({ name: 'ISU Short Track World Tour #3', event_sub_type_name: 'ISU World Tour' })).toBe(false);
     expect(isJunior({ name: 'Olympic Winter Games 2026 Short Track Speed Skating', event_sub_type_name: 'Olympic Games' })).toBe(false);
+    // Named like a senior event; only the slug says junior.
+    expect(isJunior({ name: 'ISU Short Track World Tour #3', event_sub_type_name: 'ISU World Tour', slug: 'isu-short-track-junior-world-cup-3' })).toBe(true);
+    expect(isJunior({ name: 'ISU Short Track World Tour #3', event_sub_type_name: 'ISU World Tour', slug: 'isu-short-track-world-tour-3-seoul' })).toBe(false);
   });
 
   it('cleans ISU city names', () => {

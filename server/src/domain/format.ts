@@ -70,9 +70,13 @@ export function eventNames(events: { name: string; series: string | null }[]): s
   });
 }
 
-/** A junior event (Junior World Cup, World Junior Championships). The app only covers senior events. */
-export function isJunior(ev: { name?: string | null; event_sub_type_name?: string | null }): boolean {
-  return /junior/i.test(`${ev.name ?? ''} ${ev.event_sub_type_name ?? ''}`);
+/**
+ * A junior event (Junior World Cup, World Junior Championships). The app only
+ * covers senior events. The slug too: ISU dropped "Junior" from its junior
+ * standings' names in 2026/27, and an event could go the same way.
+ */
+export function isJunior(ev: { name?: string | null; event_sub_type_name?: string | null; slug?: string | null }): boolean {
+  return /junior/i.test(`${ev.name ?? ''} ${ev.event_sub_type_name ?? ''} ${ev.slug ?? ''}`);
 }
 
 /** ISU's city, without the arena ("Salt Lake City, Utah Olympic Oval") and with a few fixes. */

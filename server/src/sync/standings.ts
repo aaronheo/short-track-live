@@ -4,6 +4,7 @@
 
 import type pg from 'pg';
 import { classifyStanding, genderOfSkaters, standingPoints, titleCaseName, type StandingInfo } from '../domain/standings.js';
+import { STANDING_LISTS_PAGE } from '../isu/client.js';
 import type { IsuStandingEntry, IsuStandingList } from '../isu/types.js';
 
 export interface StandingsSource {
@@ -49,9 +50,11 @@ export class StandingsSync {
     const lists = await this.isu.standingLists(season.isu_id);
     // A stored list we no longer keep (a junior list ISU named like a senior
     // one, before we could tell) goes, or the app shows that distance twice.
-    // Only on a full answer from ISU: an empty one keeps what we have.
+    // Only on a whole answer from ISU: an empty one (an outage) or a full page
+    // of 100 (there may be more we didn't ask for) keeps what we have.
     const kept = new Set(lists.filter((l) => classifyStanding(l)).map((l) => l.world_standings_list_fsk_id));
-    const gone = lists.length ? [...stored.keys()].filter((id) => !kept.has(id)) : [];
+    const whole = lists.length > 0 && lists.length < STANDING_LISTS_PAGE;
+    const gone = whole ? [...stored.keys()].filter((id) => !kept.has(id)) : [];
     if (gone.length) {
       await this.pool.query('delete from standing where id = any($1::int[])', [gone]);
       this.log(`${season.title}: removed ${gone.length} standings we don't keep (${gone.join(', ')})`);
