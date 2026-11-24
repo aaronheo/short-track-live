@@ -160,5 +160,6 @@ Propose the design of 2–4 to Aaron before building; 4 involves new infrastruct
 - Changing an app setting in the simulator: `defaults write` on the bundle id doesn't reach the app. Use the container plist path through cfprefsd: `xcrun simctl spawn <udid> defaults write "<data container>/Library/Preferences/com.aaronheo.shorttracklive" <key> -bool false`. Bundle id: `com.aaronheo.shorttracklive`.
 - macOS has no `timeout`; long waits go in background shell tasks.
 - Render's free plan sleeps after 15 minutes idle; the worker only polls ISU while the service is awake. Its disk (the ISU cache) is wiped on every deploy.
+- Render's free plan also caps outbound bandwidth at 5 GB a month, and every query to Supabase counts. With no payment method on file, going over suspends the service until the 1st (it happened on 2026-11-22). The worker therefore caches its per-tick queries and skips writing ISU answers that haven't changed (`signature()` in `ingest.ts`). Keep new per-tick or per-poll database work cheap. Check usage with the Render tools' `get_metrics` `bandwidth_usage`.
 - `cd` inside parallel shell commands can race; prefer absolute paths.
 - New tables: enable RLS, revoke from `anon`/`authenticated` (see 0008/0009), and decide deliberately whether `chat_reader` may read them.

@@ -97,6 +97,34 @@ describe.skipIf(!url)('database + API', () => {
     }
   });
 
+  it('writes a live poll only when ISU\'s answer changed', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const { rnd } = round(tree(WT1_2026), 'Men 1500 m', 'Quarterfinals');
+      const heats = structuredClone(rnd.heats);
+      const ingest = new Ingest(client);
+      const roundIsuId = rnd.event_result_round_id;
+      expect(await ingest.loadRoundHeats(roundIsuId, heats, false)).toBe(true);
+      // A repeat answer writes nothing: a row changed behind its back stays changed.
+      await client.query(`update heat set name = 'marker' where isu_id = $1`, [heats[0]!.event_result_round_heats_id]);
+      expect(await ingest.loadRoundHeats(roundIsuId, structuredClone(heats), false)).toBe(false);
+      const marked = await client.query<{ name: string }>('select name from heat where isu_id = $1', [heats[0]!.event_result_round_heats_id]);
+      expect(marked.rows[0]!.name).toBe('marker');
+      // A changed answer is written in full.
+      heats[0]!.updated_at = '2026-10-23T23:59:00';
+      expect(await ingest.loadRoundHeats(roundIsuId, heats, false)).toBe(true);
+      const rewritten = await client.query<{ name: string }>('select name from heat where isu_id = $1', [heats[0]!.event_result_round_heats_id]);
+      expect(rewritten.rows[0]!.name).not.toBe('marker');
+      // After a whole-event pull, the next poll writes again.
+      ingest.forgetLiveHeats();
+      expect(await ingest.loadRoundHeats(roundIsuId, heats, false)).toBe(true);
+    } finally {
+      await client.query('rollback');
+      client.release();
+    }
+  });
+
   it('builds schedules from ISU, from names, and from round times', async () => {
     const counts = await pool.query<{ slug: string; items: number; linked: number; source: string }>(
       `select e.slug, count(*)::int as items, count(si.round_id)::int as linked, min(si.source::text) as source

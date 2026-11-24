@@ -1,10 +1,10 @@
 import type pg from 'pg';
-import { Ingest, SETTLE_DAYS, eventState } from '../db/ingest.js';
+import { Ingest, SETTLE_DAYS, eventState, signature } from '../db/ingest.js';
 import { competitionName, roundName } from '../domain/normalize.js';
 import { isJunior } from '../domain/format.js';
 import { isuLocalDate } from '../domain/time.js';
 import { isRelay, type IsuClient } from '../isu/client.js';
-import type { IsuEvent } from '../isu/types.js';
+import type { IsuEvent, IsuRound } from '../isu/types.js';
 import type { PushDevices } from '../push/devices.js';
 import { StandingsSync } from './standings.js';
 
@@ -27,6 +27,12 @@ const LIVE_STANDINGS_EVERY = 60 * 60_000; // ...hourly around an event: ISU reca
 // public URL to stay up; a GitHub Actions cron wakes us every few hours to
 // notice an event coming (.github/workflows/wake.yml).
 const KEEP_AWAKE_EVERY = 10 * 60_000;
+// The free plan also caps outbound traffic (5 GB a month), and every query to
+// Supabase counts. The loop ticks every second, so what it asks the database
+// on each tick is cached, and ISU answers that haven't changed aren't written.
+const LIVE_EVENTS_EVERY = 60_000; // which events to poll
+const ROUNDS_EVERY = HOT_HEATS_EVERY; // which rounds are hot or running (sooner after a write)
+const PUSH_EVERY = 30_000; // alerts that come due with time; a change sends them at once
 
 type Log = (msg: string) => void;
 
@@ -49,6 +55,11 @@ export class SyncWorker {
   private lastEventList = 0;
   private lastFinishCheck = new Map<number, number>();
   private lastKeepAwake = 0;
+  private lastPush = 0;
+  private live: { at: number; events: { id: number; slug: string; state: string }[] } | null = null;
+  private rounds = new Map<number, { at: number; rounds: PollRound[] }>();
+  /** Per event: ISU's competitions, rounds and schedule as last stored. */
+  private structureSignatures = new Map<number, string>();
   private stopped = false;
 
   constructor(
@@ -136,6 +147,7 @@ export class SyncWorker {
       const { eventId } = await new Ingest(client).loadTree(tree);
       const { complete, gaps, noResults } = await new Ingest(client).markSynced(eventId);
       await client.query('commit');
+      this.forgetWrites();
       const outcome = noResults ? ', no results at ISU, left out' : gaps ? `, complete (ISU is missing ${gaps})` : complete ? ', complete' : '';
       this.log(`${ev.name} (${ev.season}): loaded, ${this.isu.requests - before} ISU requests${outcome}`);
     } catch (err) {
@@ -172,7 +184,9 @@ export class SyncWorker {
   stop(): void { this.stopped = true; }
 
   async tick(now: number): Promise<void> {
-    const live = await this.liveEvents(now);
+    if (!this.live || now - this.live.at >= LIVE_EVENTS_EVERY) this.live = { at: now, events: await this.liveEvents(now) };
+    const live = this.live.events;
+    let changed = false;
     // ISU's answers about live events are recorded (IsuRecorder): the event
     // list and the live polling, not the settling events' pulls or standings.
     this.isu.recording = false;
@@ -187,6 +201,7 @@ export class SyncWorker {
       // and tried again next time, without holding up the others or the
       // live polling below.
       for (const ev of events) await this.guard(ev.name, () => this.ingest.upsertEvent(ev));
+      this.live = null;
       this.log(`refreshed ${current} event list`);
       // Finished events that haven't settled, fetched again for ISU's corrections.
       for (const ev of events) {
@@ -198,17 +213,29 @@ export class SyncWorker {
 
     this.isu.recording = true;
     for (const ev of live) {
-      const rounds = prioritizeRounds(await this.roundsToPoll(ev.id, now));
+      let cached = this.rounds.get(ev.id);
+      if (!cached || now - cached.at >= ROUNDS_EVERY) {
+        cached = { at: now, rounds: prioritizeRounds(await this.roundsToPoll(ev.id, now)) };
+        this.rounds.set(ev.id, cached);
+      }
+      const rounds = cached.rounds;
       // Ask for the active (or imminently starting) race first. A structure
       // refresh can fan out into dozens of ISU calls, so never put it ahead of
       // a running heat on the shared one-request-per-second queue.
-      await this.pollRounds(rounds.filter((r) => r.hot), now);
+      let heatsChanged = await this.pollRounds(rounds.filter((r) => r.hot), now);
+      let structureChanged = false;
       if (!rounds.some((r) => r.running)
         && now - (this.lastStructure.get(ev.id) ?? 0) >= STRUCTURE_EVERY) {
         this.lastStructure.set(ev.id, now);
-        await this.guard(ev.slug, () => this.refreshStructure(ev));
+        structureChanged = await this.guard(ev.slug, () => this.refreshStructure(ev)) ?? false;
       }
-      if (!rounds.some((r) => r.running)) await this.pollRounds(rounds.filter((r) => !r.hot), now);
+      if (!rounds.some((r) => r.running)) heatsChanged = await this.pollRounds(rounds.filter((r) => !r.hot), now) || heatsChanged;
+      if (heatsChanged || structureChanged) {
+        // Which rounds are hot or running, and whether the event is still live, may have moved.
+        this.rounds.delete(ev.id);
+        this.live = null;
+        changed = true;
+      }
       if (ev.state === 'finished' && now - (this.lastFinishCheck.get(ev.id) ?? 0) >= FINISH_CHECK_EVERY) {
         this.lastFinishCheck.set(ev.id, now);
         await this.guard(ev.slug, () => this.finishEvent(ev, now));
@@ -216,7 +243,8 @@ export class SyncWorker {
     }
     this.isu.recording = false;
 
-    if (live.length && this.opts.push?.enabled) {
+    if (live.length && this.opts.push?.enabled && (changed || now - this.lastPush >= PUSH_EVERY)) {
+      this.lastPush = now;
       const sent = await this.opts.push.sendDue(new Date(now)).catch((err) => {
         this.log(`push failed: ${(err as Error).message}`);
         return 0;
@@ -248,16 +276,31 @@ export class SyncWorker {
     return res.rows;
   }
 
-  /** Competitions, rounds and schedule for one live event (no heats). */
-  private async refreshStructure(ev: { id: number; slug: string }): Promise<void> {
+  /**
+   * Competitions, rounds and schedule for one live event (no heats). Returns
+   * false, without writing, when ISU's answers are the same as last time.
+   */
+  private async refreshStructure(ev: { id: number; slug: string }): Promise<boolean> {
     const comps = await this.isu.competitions(ev.slug);
+    const compRounds: IsuRound[][] = [];
+    for (const comp of comps) compRounds.push(await this.isu.rounds(comp.event_result_id));
+    const schedule = await this.isu.schedule(ev.slug);
+    // Round start times come from heats and feed the schedule. ISU touches
+    // every competition's and round's updated_at about once a minute whether
+    // or not anything changed, and we don't store it.
+    const starts = (await this.pool.query<{ isu_id: number; starts_at: Date | null }>(
+      `select r.isu_id, r.starts_at from round r join competition c on c.id = r.competition_id
+       where c.event_id = $1 order by r.isu_id`, [ev.id])).rows;
+    const sig = signature([comps, compRounds, schedule, starts], ['updated_at']);
+    if (this.structureSignatures.get(ev.id) === sig) return false;
+
     const roundIds = new Map<number, number>();
     const roundKeys = new Map<string, number>();
     const norm = (s: string) => s.toLowerCase().replace(/'s\b/g, '').replace(/[^a-z0-9]/g, '');
     const named: { title: string; label: string; roundId: number }[] = [];
-    for (const comp of comps) {
+    for (const [i, comp] of comps.entries()) {
       const compId = await this.ingest.upsertCompetition(ev.id, comp);
-      const rounds = await this.isu.rounds(comp.event_result_id);
+      const rounds = compRounds[i]!;
       const ids = await this.ingest.upsertRounds(compId, rounds);
       for (const r of rounds) {
         const rid = ids.get(r.event_result_round_id)!;
@@ -269,10 +312,20 @@ export class SyncWorker {
     }
     await this.ingest.dropUnlistedCompetitions(ev.id, comps.map((c) => c.event_result_id));
     const derived = await this.ingest.withStarts(named);
-    await this.ingest.rebuildSchedule(ev.id, await this.isu.schedule(ev.slug), roundIds, roundKeys, derived);
+    await this.ingest.rebuildSchedule(ev.id, schedule, roundIds, roundKeys, derived);
     if (comps.length && comps.every((c) => eventState(c.status) === 'finished')) {
       await this.pool.query(`update event set state = 'finished' where id = $1`, [ev.id]);
     }
+    this.structureSignatures.set(ev.id, sig);
+    return true;
+  }
+
+  /** The database was written behind the live polling's back: compare against nothing next time. */
+  private forgetWrites(): void {
+    this.ingest.forgetLiveHeats();
+    this.structureSignatures.clear();
+    this.rounds.clear();
+    this.live = null;
   }
 
   /** Rounds that are racing or due soon (hot), and upcoming ones whose start lists may change. */
@@ -297,16 +350,20 @@ export class SyncWorker {
     return [...res.rows, ...pending.rows.map((r) => ({ ...r, hot: true, running: false }))];
   }
 
-  private async pollRounds(rounds: PollRound[], now: number): Promise<void> {
+  /** True when something was written. */
+  private async pollRounds(rounds: PollRound[], now: number): Promise<boolean> {
+    let changed = false;
     for (const r of rounds) {
       const every = r.hot ? HOT_HEATS_EVERY : START_LISTS_EVERY;
       if (now - (this.lastHeats.get(r.id) ?? 0) < every) continue;
       this.lastHeats.set(r.id, now);
-      await this.guard(`round ${r.isu_id}`, async () => {
+      const wrote = await this.guard(`round ${r.isu_id}`, async () => {
         const heats = await this.isu.heats(r.comp_isu_id, r.isu_id, r.is_relay);
-        await this.ingest.loadRoundHeats(r.isu_id, heats, r.is_relay);
+        return this.ingest.loadRoundHeats(r.isu_id, heats, r.is_relay);
       });
+      if (wrote) changed = true;
     }
+    return changed;
   }
 
   /**
@@ -314,12 +371,13 @@ export class SyncWorker {
    * it end the tick. A lost database connection still ends it: nothing else
    * would work either, and run() backs off.
    */
-  private async guard(what: string, work: () => Promise<unknown>): Promise<void> {
+  private async guard<T>(what: string, work: () => Promise<T>): Promise<T | undefined> {
     try {
-      await work();
+      return await work();
     } catch (err) {
       if (isConnectionError(err)) throw err;
       this.log(`${what}: ${(err as Error).message}; skipped this time`);
+      return undefined;
     }
   }
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Db } from './pool.js';
 import { isRelay } from '../isu/client.js';
 import type { EventTree, IsuCompetition, IsuEvent, IsuHeat, IsuRound, IsuScheduleItem, IsuSkater } from '../isu/types.js';
@@ -43,8 +44,16 @@ async function upsertMany(
 
 export interface LoadedEvent { eventId: number; timeZone: string }
 
+/** A short fingerprint of some JSON-able data, to tell whether it changed. Keys in `ignore` are left out. */
+export function signature(data: unknown, ignore: string[] = []): string {
+  const json = JSON.stringify(data, (key, value) => (ignore.includes(key) ? undefined : value));
+  return createHash('sha1').update(json).digest('hex');
+}
+
 export class Ingest {
   private knownNations = new Set<string>();
+  /** Per ISU round id: what the last live poll stored, so an unchanged answer isn't written again. */
+  private heatSignatures = new Map<number, string>();
 
   constructor(private readonly db: Db) {}
 
@@ -170,18 +179,31 @@ export class Ingest {
     });
   }
 
-  /** Live polling: refresh one round's heats. */
-  async loadRoundHeats(roundIsuId: number, heats: IsuHeat[], relay: boolean): Promise<void> {
+  /**
+   * Live polling: refresh one round's heats. Returns false, without writing,
+   * when ISU's answer (and the round it lands in) is the same as last time:
+   * every write is outbound traffic from Render, which the free plan caps.
+   */
+  async loadRoundHeats(roundIsuId: number, heats: IsuHeat[], relay: boolean): Promise<boolean> {
+    if (heats.length === 0) return false;
     const res = await this.db.query<{ id: number; name: string; time_zone: string; finished: boolean; scheduled_at: Date | null }>(
       `select r.id, r.name, e.time_zone, e.state = 'finished' as finished,
          (select min(si.starts_at) from schedule_item si where si.round_id = r.id and si.source = 'isu') as scheduled_at
        from round r join competition c on c.id = r.competition_id
        join event e on e.id = c.event_id where r.isu_id = $1`, [roundIsuId]);
     const row = res.rows[0];
-    if (row) {
-      await this.loadHeats(row.id, row.time_zone, heats, relay,
-        { round: row.name, eventFinished: row.finished, scheduledAt: row.scheduled_at });
-    }
+    if (!row) return false;
+    const sig = signature([row, relay, heats]);
+    if (this.heatSignatures.get(roundIsuId) === sig) return false;
+    await this.loadHeats(row.id, row.time_zone, heats, relay,
+      { round: row.name, eventFinished: row.finished, scheduledAt: row.scheduled_at });
+    this.heatSignatures.set(roundIsuId, sig);
+    return true;
+  }
+
+  /** Something else wrote heats (a whole-event pull): the next live poll writes again. */
+  forgetLiveHeats(): void {
+    this.heatSignatures.clear();
   }
 
   async loadHeats(
