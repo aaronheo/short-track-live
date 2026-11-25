@@ -24,8 +24,8 @@ const STANDINGS_EVERY = 6 * 60 * 60_000; // ISU's World Tour standings (only cha
 const LIVE_STANDINGS_EVERY = 60 * 60_000; // ...hourly around an event: ISU recalculates after each day of racing
 // Render's free plan sleeps after 15 minutes without requests, and a sleeping
 // server neither polls ISU nor pushes. Around an event we request our own
-// public URL to stay up; a GitHub Actions cron wakes us every few hours to
-// notice an event coming (.github/workflows/wake.yml).
+// public URL to stay up, once something (like someone opening the app) has
+// woken us.
 const KEEP_AWAKE_EVERY = 10 * 60_000;
 // The free plan also caps outbound traffic (5 GB a month), and every query to
 // Supabase counts. The loop ticks every second, so what it asks the database
