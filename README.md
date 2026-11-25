@@ -82,7 +82,7 @@ When the server can't push (no APNs key, or it can't be reached) the phone does 
 
 When a favorite's individual race is up next, the server starts a Live Activity on the phone with a push (the phone registers its push-to-start token with `PUT /devices/:token`, `activityToken`). The activity shows "up next", then the race lap by lap (lap, progress, the top three plus the favorite with gaps to the leader), then the result; it ends when the result is official and stays on the Lock Screen 30 minutes. The phone reports each activity's own token (`PUT /activities/:token { device, heatId }`) and the worker sends an update after each poll when something changed (`live_activity`, `domain/activity.ts`). The widget extension (`ios/ShortTrackLiveWidgets`) and the app share `ios/Shared/RaceActivity.swift`, whose keys match the server's. Profile → Notifications → Live Activities turns it off. To see one without the server, a Debug build launched with `-sampleActivity` starts a sample: `xcrun simctl launch <device> com.aaronheo.shorttracklive -sampleActivity`, then switch apps (iOS hides an app's own activity while it's in front).
 
-Render's free plan sleeps after 15 idle minutes, and a sleeping server neither polls ISU nor pushes. While an event is on or a day away, the worker requests its own public URL (`RENDER_EXTERNAL_URL`) every 10 minutes to stay up. Nothing wakes it on a schedule: it starts when someone opens the app.
+Render's free plan sleeps after 15 idle minutes, and a sleeping server neither polls ISU nor pushes. Nothing keeps it awake: it starts when someone opens the app and sleeps again after 15 minutes without requests.
 
 ### Standings
 

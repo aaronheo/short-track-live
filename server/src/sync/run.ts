@@ -23,8 +23,6 @@ export async function startSync(opts: { backfillOnly?: boolean; allHistory?: boo
   });
   const worker = new SyncWorker(isu, pool, undefined, {
     push: opts.push ? new PushDevices(pool, opts.push) : null,
-    // Render sets this to the service's public URL.
-    keepAwakeUrl: process.env.RENDER_EXTERNAL_URL ?? null,
   });
   const { current, previous } = await worker.seasons();
   if (opts.allHistory) {
